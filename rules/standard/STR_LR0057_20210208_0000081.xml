@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="euc-kr"?>
+<str:STR xmlns:str="http://www.kofiu.go.kr/str" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.kofiu.go.kr/str" Version="5.0" Code="BA">
+	<Organization>
+		<OrgName Code="LR0057">주식회사 카카오</OrgName>
+		<MainAuthor Userid="4807">이윤지</MainAuthor>
+		<Manager>정태성</Manager>
+		<Phone>010-3563-3258</Phone>
+		<Address ZipCode="13494 ">경기도 성남시 분당구 판교역로 235 에이치스퀘어 엔동H스퀘어</Address>
+		<Email>eanna.lee@kakaocorp.com</Email>
+	</Organization>
+	<Master>
+		<FiuDocNum>LR005720210200081</FiuDocNum>
+		<FormerFiuDocNum />
+		<StartDate>20201125</StartDate>
+		<EndDate>20201125</EndDate>
+		<InnerCount>0</InnerCount>
+		<OuterCount>0</OuterCount>
+		<InnerKRWAmount>0</InnerKRWAmount>
+		<OuterKRWAmount>0</OuterKRWAmount>
+		<InnerUSDAmount>0</InnerUSDAmount>
+		<OuterUSDAmount>0</OuterUSDAmount>
+		<Count>1</Count>
+		<KRWAmount>0</KRWAmount>
+		<USDAmount>0</USDAmount>
+		<MessageTypeCode>01</MessageTypeCode>
+		<DocSendDate>20210122</DocSendDate>
+		<SuspicionReport>
+			<Who>선앤심 인터내셔널 (주)</Who>
+			<When>2021-01-21</When>
+			<Where>카카오 </Where>
+			<What>test</What>
+			<How>test</How>
+			<Why>test</Why>
+			<SyntheticOpinion>1.거래자 정보, 거래정황 등
+-성명  선앤심 인터내셔널 (주)
+-고객번호:()
+-주소:   
+-직장명:  
+-연락처: 
+-생년월일: 
+
+2.거래내용, 거래빈도 등 
+-상품명: 
+-계좌번호: 
+
+3.의심 판단 및 보고사유
+()</SyntheticOpinion>
+			<BranchOfficeScore>1</BranchOfficeScore>
+			<OrgScore>5</OrgScore>
+			<RelationFiuDocNum />
+			<EtcPecularityType />
+		</SuspicionReport>
+	</Master>
+	<Detail>
+		<Transaction>
+			<Seq>1</Seq>
+			<Date>20201125</Date>
+			<Time>121146</Time>
+			<Channel Code="99">기타</Channel>
+			<Mean Code="99">기타</Mean>
+			<Method Code="99">기타</Method>
+			<Goods Code="99">기타</Goods>
+			<MoneyType Code="KRW">한국 원</MoneyType>
+			<KRWAmount>0.0</KRWAmount>
+			<ForeignAmount>0.0</ForeignAmount>
+			<USDAmount>0.0</USDAmount>
+			<OrgName Code="LR0057">주식회사 카카오</OrgName>
+			<BranchOffice ZipCode="99999" Code="ZZZZZZZ">UNKNOWN</BranchOffice>
+			<UserRelation>
+				<RelationRole Code="01">의심거래자</RelationRole>
+				<RealNumber Code="03">7378701494</RealNumber>
+			</UserRelation>
+		</Transaction>
+		<User>
+			<RealNumber Code="03">7378701494</RealNumber>
+			<RealNumberTypeName>사업자등록번호</RealNumberTypeName>
+                                      <Name>선앤심 인터내셔널 (주)</Name>
+                                      <Nationality Code="KR">대한민국</Nationality>
+			<Phone HandPhone="">01012345678</Phone>
+			<Address ZipCode="13480">경기 성남시 분당구 대왕판교로 477(판교동) 9층</Address>
+			<CeoName>홍길동</CeoName>
+			<KSIC Code="46490">가방 시계 안경 및 기타 생활용품 도매업</KSIC>
+			<BizTelNo>01012345678</BizTelNo>
+			<BizScale Code="02">중소기업</BizScale>
+		</User>
+	</Detail>
+	<FileAttach />
+</str:STR>
+

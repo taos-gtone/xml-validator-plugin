@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension
+         point="org.eclipse.ui.commands">
+      <command
+            defaultHandler="com.xmlvalidator.handlers.ValidateXmlHandler"
+            id="com.xmlvalidator.commands.validateXml"
+            name="Validate XML Files">
+      </command>
+   </extension>
+   <extension
+         point="org.eclipse.ui.menus">
+      <menuContribution
+            locationURI="menu:org.eclipse.ui.main.menu?after=additions">
+         <menu
+               id="com.xmlvalidator.menus.xmlMenu"
+               label="XML Validator">
+            <command
+                  commandId="com.xmlvalidator.commands.validateXml"
+                  id="com.xmlvalidator.menus.validateXml"
+                  label="Validate XML"
+                  style="push">
+            </command>
+         </menu>
+      </menuContribution>
+   </extension>
+   <extension
+         point="org.eclipse.ui.views">
+      <view
+            class="com.xmlvalidator.views.XmlValidationView"
+            id="com.xmlvalidator.views.xmlValidationView"
+            name="STR XML Validator"
+            restorable="true">
+      </view>
+   </extension>
+</plugin>

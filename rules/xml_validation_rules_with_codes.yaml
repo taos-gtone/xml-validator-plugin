@@ -1,0 +1,2343 @@
+version: '5.6'
+description: STR XML 정합성 규칙 정의서
+encoding: EUC-KR
+rules:
+  STR:
+    description: STR보고서 버전정보* 일반/카지노 구분*
+    occurrence: '1'
+    required: fixed required
+    data_type: 3 2
+    note: '일반금융기관 : "BA", 카지노 : "CA"'
+    attributes:
+      Version: '5.0'
+      Code:
+        type: enum
+        allowed_values:
+        - BA
+        - CA
+        description: '일반금융기관 : "BA", 카지노 : "CA"'
+    children:
+      Organization:
+        description: 보고기관정보
+        occurrence: '1'
+        children:
+          OrgName:
+            description: 보고기관명 보고기관코드*
+            occurrence: '1'
+            required: required
+            data_type: '- 6'
+            attributes:
+              Code: ''
+          MainAuthor:
+            description: 보고담당자명 보고자 아이디*
+            occurrence: '1'
+            required: optional
+            data_type: 60 20
+            note: 보고자아이디가 없을경우 Optional 이며, 보고자성명은 필수 항목
+            attributes:
+              Userid: ''
+          Manager:
+            description: 보고책임자명
+            occurrence: '1'
+            required: required
+            data_type: '60'
+          Phone:
+            description: 보고담당자전화번호
+            occurrence: '1'
+            required: required
+            data_type: '25'
+          Address:
+            description: 주소 우편번호*
+            occurrence: '1'
+            required: required
+            data_type: 200 6
+            attributes:
+              ZipCode: ''
+          Email:
+            description: 이메일
+            occurrence: 0..1
+            data_type: '30'
+      Master:
+        description: STR 취합내용 + 의심정도
+        occurrence: '1'
+        children:
+          FiuDocNum:
+            description: 보고번호
+            occurrence: '1'
+            required: required
+            data_type: '17'
+            format: 금칙어 체크(<,>,",;)
+            note: 금융기관코드(6)+년월(6)+순번(5)  예) AA000120200100001
+          FormerFiuDocNum:
+            description: 종전 보고문서번호
+            occurrence: 0..1
+            data_type: '17'
+            note: 재보고,추가자료제공의 경우 기재
+          StartDate:
+            description: 거래시작일
+            occurrence: '1'
+            required: required
+            data_type: '8'
+            format: YYYYMMDD
+            note: 거래일자중에서 가장 빠른 일자
+          EndDate:
+            description: 거래종료일
+            occurrence: '1'
+            required: required
+            data_type: '8'
+            format: YYYYMMDD
+            note: 거래일자중에서 가장 늦은 일자
+          InnerCount:
+            description: 입금횟수
+            occurrence: '1'
+            data_type: numeric(4)
+            note: 'default값 : 0, 입금거래에 해당되는 종류는 거래종류코드참조'
+            allowed_codes:
+            - '01'
+            - '02'
+            - '03'
+            - '04'
+            - '05'
+            - '06'
+            - '07'
+            - '08'
+            - '09'
+            - '10'
+            - '11'
+            - '12'
+            - '13'
+            - '14'
+            - '15'
+            - '16'
+            - '17'
+            - '18'
+            - '19'
+            - '20'
+            - '21'
+            - '22'
+            - '23'
+            - '24'
+            - '25'
+            - '26'
+            - '27'
+            - '28'
+            - '29'
+            - '30'
+            - '31'
+            - '32'
+            - '33'
+            - '34'
+            - '70'
+            - '71'
+            - '99'
+            code_reference: 거래종류
+            code_labels:
+              '01': 입금
+              '02': 출금
+              '03': 환전
+              '04': 영수
+              '05': 송금
+              '06': 융자
+              '07': 상환
+              '08': 이체영수
+              '09': 이체송금
+              '10': 매수
+              '11': 매도
+              '12': 입고
+              '13': 출고
+              '14': 대체입고
+              '15': 대체출고
+              '16': 수표지급
+              '17': 수표발행
+              '18': 계약
+              '19': 해지
+              '20': 보험료납입
+              '21': 보험금지급
+              '22': 지급
+              '23': 발행
+              '24': 증권청약
+              '25': 신용판매(국내)
+              '26': 현금서비스(국내)
+              '27': 체크카드결제(국내)
+              '28': 신용판매(해외)
+              '29': 현금서비스(해외)
+              '30': 체크카드결제(해외)
+              '31': 가상자산 매수
+              '32': 가상자산 매도
+              '33': 가상자산 입고
+              '34': 가상자산 출고
+              '99': 기타
+          OuterCount:
+            description: 출금횟수
+            occurrence: '1'
+            data_type: numeric(4)
+            note: 'default값 : 0, 출금거래에 해당되는 종류는 거래종류코드참조'
+            allowed_codes:
+            - '01'
+            - '02'
+            - '03'
+            - '04'
+            - '05'
+            - '06'
+            - '07'
+            - '08'
+            - '09'
+            - '10'
+            - '11'
+            - '12'
+            - '13'
+            - '14'
+            - '15'
+            - '16'
+            - '17'
+            - '18'
+            - '19'
+            - '20'
+            - '21'
+            - '22'
+            - '23'
+            - '24'
+            - '25'
+            - '26'
+            - '27'
+            - '28'
+            - '29'
+            - '30'
+            - '31'
+            - '32'
+            - '33'
+            - '34'
+            - '70'
+            - '71'
+            - '99'
+            code_reference: 거래종류
+            code_labels:
+              '01': 입금
+              '02': 출금
+              '03': 환전
+              '04': 영수
+              '05': 송금
+              '06': 융자
+              '07': 상환
+              '08': 이체영수
+              '09': 이체송금
+              '10': 매수
+              '11': 매도
+              '12': 입고
+              '13': 출고
+              '14': 대체입고
+              '15': 대체출고
+              '16': 수표지급
+              '17': 수표발행
+              '18': 계약
+              '19': 해지
+              '20': 보험료납입
+              '21': 보험금지급
+              '22': 지급
+              '23': 발행
+              '24': 증권청약
+              '25': 신용판매(국내)
+              '26': 현금서비스(국내)
+              '27': 체크카드결제(국내)
+              '28': 신용판매(해외)
+              '29': 현금서비스(해외)
+              '30': 체크카드결제(해외)
+              '31': 가상자산 매수
+              '32': 가상자산 매도
+              '33': 가상자산 입고
+              '34': 가상자산 출고
+              '99': 기타
+          InnerKRWAmount:
+            description: 입금원화금액
+            occurrence: '1'
+            data_type: numeric(15)
+            note: 'default값 : 0, 입금거래에 해당되는 종류는 거래종류코드참조'
+            allowed_codes:
+            - '01'
+            - '02'
+            - '03'
+            - '04'
+            - '05'
+            - '06'
+            - '07'
+            - '08'
+            - '09'
+            - '10'
+            - '11'
+            - '12'
+            - '13'
+            - '14'
+            - '15'
+            - '16'
+            - '17'
+            - '18'
+            - '19'
+            - '20'
+            - '21'
+            - '22'
+            - '23'
+            - '24'
+            - '25'
+            - '26'
+            - '27'
+            - '28'
+            - '29'
+            - '30'
+            - '31'
+            - '32'
+            - '33'
+            - '34'
+            - '70'
+            - '71'
+            - '99'
+            code_reference: 거래종류
+            code_labels:
+              '01': 입금
+              '02': 출금
+              '03': 환전
+              '04': 영수
+              '05': 송금
+              '06': 융자
+              '07': 상환
+              '08': 이체영수
+              '09': 이체송금
+              '10': 매수
+              '11': 매도
+              '12': 입고
+              '13': 출고
+              '14': 대체입고
+              '15': 대체출고
+              '16': 수표지급
+              '17': 수표발행
+              '18': 계약
+              '19': 해지
+              '20': 보험료납입
+              '21': 보험금지급
+              '22': 지급
+              '23': 발행
+              '24': 증권청약
+              '25': 신용판매(국내)
+              '26': 현금서비스(국내)
+              '27': 체크카드결제(국내)
+              '28': 신용판매(해외)
+              '29': 현금서비스(해외)
+              '30': 체크카드결제(해외)
+              '31': 가상자산 매수
+              '32': 가상자산 매도
+              '33': 가상자산 입고
+              '34': 가상자산 출고
+              '99': 기타
+          OuterKRWAmount:
+            description: 출금원화금액
+            occurrence: '1'
+            data_type: numeric(15)
+            note: 'default값 : 0, 출금거래에 해당되는 종류는 거래종류코드참조'
+            allowed_codes:
+            - '01'
+            - '02'
+            - '03'
+            - '04'
+            - '05'
+            - '06'
+            - '07'
+            - '08'
+            - '09'
+            - '10'
+            - '11'
+            - '12'
+            - '13'
+            - '14'
+            - '15'
+            - '16'
+            - '17'
+            - '18'
+            - '19'
+            - '20'
+            - '21'
+            - '22'
+            - '23'
+            - '24'
+            - '25'
+            - '26'
+            - '27'
+            - '28'
+            - '29'
+            - '30'
+            - '31'
+            - '32'
+            - '33'
+            - '34'
+            - '70'
+            - '71'
+            - '99'
+            code_reference: 거래종류
+            code_labels:
+              '01': 입금
+              '02': 출금
+              '03': 환전
+              '04': 영수
+              '05': 송금
+              '06': 융자
+              '07': 상환
+              '08': 이체영수
+              '09': 이체송금
+              '10': 매수
+              '11': 매도
+              '12': 입고
+              '13': 출고
+              '14': 대체입고
+              '15': 대체출고
+              '16': 수표지급
+              '17': 수표발행
+              '18': 계약
+              '19': 해지
+              '20': 보험료납입
+              '21': 보험금지급
+              '22': 지급
+              '23': 발행
+              '24': 증권청약
+              '25': 신용판매(국내)
+              '26': 현금서비스(국내)
+              '27': 체크카드결제(국내)
+              '28': 신용판매(해외)
+              '29': 현금서비스(해외)
+              '30': 체크카드결제(해외)
+              '31': 가상자산 매수
+              '32': 가상자산 매도
+              '33': 가상자산 입고
+              '34': 가상자산 출고
+              '99': 기타
+          InnerUSDAmount:
+            description: 입금달러화금액
+            occurrence: '1'
+            data_type: numeric(15)
+            note: 'default값 : 0, 입금거래에 해당되는 종류는 거래종류코드참조'
+            allowed_codes:
+            - '01'
+            - '02'
+            - '03'
+            - '04'
+            - '05'
+            - '06'
+            - '07'
+            - '08'
+            - '09'
+            - '10'
+            - '11'
+            - '12'
+            - '13'
+            - '14'
+            - '15'
+            - '16'
+            - '17'
+            - '18'
+            - '19'
+            - '20'
+            - '21'
+            - '22'
+            - '23'
+            - '24'
+            - '25'
+            - '26'
+            - '27'
+            - '28'
+            - '29'
+            - '30'
+            - '31'
+            - '32'
+            - '33'
+            - '34'
+            - '70'
+            - '71'
+            - '99'
+            code_reference: 거래종류
+            code_labels:
+              '01': 입금
+              '02': 출금
+              '03': 환전
+              '04': 영수
+              '05': 송금
+              '06': 융자
+              '07': 상환
+              '08': 이체영수
+              '09': 이체송금
+              '10': 매수
+              '11': 매도
+              '12': 입고
+              '13': 출고
+              '14': 대체입고
+              '15': 대체출고
+              '16': 수표지급
+              '17': 수표발행
+              '18': 계약
+              '19': 해지
+              '20': 보험료납입
+              '21': 보험금지급
+              '22': 지급
+              '23': 발행
+              '24': 증권청약
+              '25': 신용판매(국내)
+              '26': 현금서비스(국내)
+              '27': 체크카드결제(국내)
+              '28': 신용판매(해외)
+              '29': 현금서비스(해외)
+              '30': 체크카드결제(해외)
+              '31': 가상자산 매수
+              '32': 가상자산 매도
+              '33': 가상자산 입고
+              '34': 가상자산 출고
+              '99': 기타
+          OuterUSDAmount:
+            description: 출금달러화금액
+            occurrence: '1'
+            data_type: numeric(15)
+            note: 'default값 : 0, 출금거래에 해당되는 종류는 거래종류코드참조'
+            allowed_codes:
+            - '01'
+            - '02'
+            - '03'
+            - '04'
+            - '05'
+            - '06'
+            - '07'
+            - '08'
+            - '09'
+            - '10'
+            - '11'
+            - '12'
+            - '13'
+            - '14'
+            - '15'
+            - '16'
+            - '17'
+            - '18'
+            - '19'
+            - '20'
+            - '21'
+            - '22'
+            - '23'
+            - '24'
+            - '25'
+            - '26'
+            - '27'
+            - '28'
+            - '29'
+            - '30'
+            - '31'
+            - '32'
+            - '33'
+            - '34'
+            - '70'
+            - '71'
+            - '99'
+            code_reference: 거래종류
+            code_labels:
+              '01': 입금
+              '02': 출금
+              '03': 환전
+              '04': 영수
+              '05': 송금
+              '06': 융자
+              '07': 상환
+              '08': 이체영수
+              '09': 이체송금
+              '10': 매수
+              '11': 매도
+              '12': 입고
+              '13': 출고
+              '14': 대체입고
+              '15': 대체출고
+              '16': 수표지급
+              '17': 수표발행
+              '18': 계약
+              '19': 해지
+              '20': 보험료납입
+              '21': 보험금지급
+              '22': 지급
+              '23': 발행
+              '24': 증권청약
+              '25': 신용판매(국내)
+              '26': 현금서비스(국내)
+              '27': 체크카드결제(국내)
+              '28': 신용판매(해외)
+              '29': 현금서비스(해외)
+              '30': 체크카드결제(해외)
+              '31': 가상자산 매수
+              '32': 가상자산 매도
+              '33': 가상자산 입고
+              '34': 가상자산 출고
+              '99': 기타
+          Count:
+            description: 거래건수
+            occurrence: '1'
+            data_type: numeric(4)
+            note: 'default값 : 0, <InnerCount> + <OuterCount>'
+          KRWAmount:
+            description: 원화금액
+            occurrence: '1'
+            data_type: numeric(15)
+            note: 'default값 : 0, <InnerKRWAmount> + <OuterKRWAmount>'
+          USDAmount:
+            description: 달러화환산금액
+            occurrence: '1'
+            data_type: numeric(15)
+            note: 'default값 : 0, <InnerUSDAmount> + <OuterUSDAmount>'
+          MessageTypeCode:
+            description: 보고구분
+            occurrence: '1'
+            required: required
+            data_type: '2'
+            format: 01, 04, 96, 99 중 택일
+            note: 메시지타입코드 참조
+            allowed_codes:
+            - '01'
+            - '04'
+            - '96'
+            - '99'
+            code_reference: 메시지타입코드
+            code_labels:
+              '01': 보고
+              '04': 재보고
+              '96': 모의보고-재보고
+              '99': 모의보고-보고
+          DocSendDate:
+            description: 보고일자
+            occurrence: '1'
+            required: required
+            data_type: '8'
+            format: YYYYMMDD
+          Suspicion:
+            description: 의심스러운 거래유형 및 정도에 관한 정보
+            occurrence: 0..1
+            children:
+              QuestionTitle:
+                description: 대항목명 대항목코드*
+                occurrence: 1..n
+                required: required
+                data_type: '- numeric(3)'
+                format: 코드 체크
+                note: 혐의객관식질의코드 참조
+                attributes:
+                  Code:
+                    type: enum
+                    allowed_values:
+                    - '100'
+                    - '200'
+                    - '300'
+                    - '400'
+                    code_reference: 의심거래유형코드
+                children:
+                  Question:
+                    description: 소항목명 소항목코드*
+                    occurrence: 1..n
+                    required: required
+                    data_type: '- numeric(3)'
+                    format: 코드 체크
+                    note: 혐의객관식질의코드 참조 (3자리 코드)
+                    attributes:
+                      Code:
+                        type: enum
+                        allowed_values:
+                        - '101'
+                        - '102'
+                        - '103'
+                        - '104'
+                        - '105'
+                        - '106'
+                        - '107'
+                        - '108'
+                        - '109'
+                        - '110'
+                        - '171'
+                        - '172'
+                        - '173'
+                        - '174'
+                        - '175'
+                        - '176'
+                        - '177'
+                        - '201'
+                        - '202'
+                        - '203'
+                        - '204'
+                        - '206'
+                        - '207'
+                        - '210'
+                        - '211'
+                        - '212'
+                        - '213'
+                        - '214'
+                        - '215'
+                        - '216'
+                        - '217'
+                        - '218'
+                        - '226'
+                        - '271'
+                        - '272'
+                        - '273'
+                        - '274'
+                        - '301'
+                        - '302'
+                        - '303'
+                        - '304'
+                        - '305'
+                        - '306'
+                        - '307'
+                        - '371'
+                        - '372'
+                        - '401'
+                        - '402'
+                        - '403'
+                        - '404'
+                        - '405'
+                        - '406'
+                        code_reference: 의심거래유형코드
+          SuspicionReport:
+            description: 의심스러운 거래에 대한 서술
+            occurrence: '1'
+            children:
+              Who:
+                description: 의심스러운 거래자 관련
+                occurrence: 0..1
+                data_type: '3000'
+                format: 금칙어 체크(<,>,",;)
+              When:
+                description: 거래 발생일자 관련
+                occurrence: 0..1
+                data_type: '3000'
+                format: 금칙어 체크(<,>,",;)
+              Where:
+                description: 거래 발생 장소 관련
+                occurrence: 0..1
+                data_type: '3000'
+                format: 금칙어 체크(<,>,",;)
+              What:
+                description: 금융거래 수단 관련
+                occurrence: 0..1
+                data_type: '3000'
+                format: 금칙어 체크(<,>,",;)
+              How:
+                description: 금융거래 방법 관련
+                occurrence: 0..1
+                data_type: '3000'
+                format: 금칙어 체크(<,>,",;)
+              Why:
+                description: 혐의거래로 판단한 사유관련
+                occurrence: '1'
+                required: required
+                data_type: '3000'
+                format: 금칙어 체크(<,>,",;)
+              SyntheticOpinion:
+                description: 종합의견
+                occurrence: '1'
+                required: required
+                data_type: '6000'
+                format: 금칙어 체크(<,>,",;)
+              BranchOfficeScore:
+                description: 영업점의심점수
+                occurrence: '1'
+                required: required
+                data_type: '10'
+                format: 1에서5사이의 정수
+              OrgScore:
+                description: 본점의심점수
+                occurrence: '1'
+                required: required
+                data_type: '10'
+                format: 1에서5사이의 정수
+              RelationFiuDocNum:
+                description: 관련문서 보고번호
+                occurrence: 0..1
+                data_type: '17'
+              EtcPecularityType:
+                description: 기타 특징및 유형
+                occurrence: 0..1
+                data_type: '3000'
+                format: 금칙어 체크(<,>,",;)
+                validation_rule_2: "의심스러운 거래유형(Suspicion)이 없을 경우 필수, Suspicion이 있을 경우 비어있어야 함"
+      Detail:
+        description: 상세내용
+        occurrence: '1'
+        children:
+          Transaction:
+            description: 거래내역
+            occurrence: 1..n
+            children:
+              Seq:
+                description: 거래일련번호
+                occurrence: '1'
+                required: required
+                data_type: numeric(3)
+              Date:
+                description: 거래일자
+                occurrence: '1'
+                required: required
+                data_type: '8'
+                format: 'YYYYMMDD
+
+                  (1900년 이후이고
+
+                  보고일보다 이전일자)'
+              Time:
+                description: 거래발생시간
+                occurrence: '1'
+                required: required
+                data_type: '6'
+                format: HHMISS
+                note: Digit 6 자리(시분초)
+              Channel:
+                description: 거래채널명 거래채널코드*
+                occurrence: '1'
+                required: required
+                data_type: 50 3
+                format: 코드 체크
+                note: 거래채널코드 참조
+                attributes:
+                  Code:
+                    type: enum
+                    allowed_values:
+                    - '01'
+                    - '02'
+                    - '03'
+                    - '04'
+                    - '05'
+                    - '06'
+                    - '07'
+                    - '08'
+                    - '09'
+                    - '10'
+                    - '11'
+                    - '13'
+                    - '14'
+                    - '15'
+                    - '16'
+                    - '17'
+                    - '18'
+                    - '19'
+                    - '20'
+                    - '70'
+                    - '71'
+                    - '99'
+                    code_reference: 거래채널
+                    code_labels:
+                      '01': 창구
+                      '02': 자동화기기
+                      '03': PB센터
+                      '04': 인터넷뱅킹
+                      '05': 전화/휴대전화
+                      '06': 콜센터
+                      '07': 대출모집인
+                      '08': 보험설계사
+                      '09': 보험대리점
+                      '10': 보험중개사
+                      '11': 방카슈랑스
+                      '13': 환전창구
+                      '14': 캐싱창구
+                      '15': 딜러
+                      '16': HTS/MTS/WTS
+                      '17': 가맹점
+                      '18': 카드모집인
+                      '19': 모바일
+                      '20': 제휴점
+                allowed_codes:
+                - '01'
+                - '02'
+                - '03'
+                - '04'
+                - '05'
+                - '06'
+                - '07'
+                - '08'
+                - '09'
+                - '10'
+                - '11'
+                - '13'
+                - '14'
+                - '15'
+                - '16'
+                - '17'
+                - '18'
+                - '19'
+                - '20'
+                - '70'
+                - '71'
+                - '99'
+                code_reference: 거래채널
+                code_labels:
+                  '01': 창구
+                  '02': 자동화기기
+                  '03': PB센터
+                  '04': 인터넷뱅킹
+                  '05': 전화/휴대전화
+                  '06': 콜센터
+                  '07': 대출모집인
+                  '08': 보험설계사
+                  '09': 보험대리점
+                  '10': 보험중개사
+                  '11': 방카슈랑스
+                  '13': 환전창구
+                  '14': 캐싱창구
+                  '15': 딜러
+                  '16': HTS/MTS/WTS
+                  '17': 가맹점
+                  '18': 카드모집인
+                  '19': 모바일
+                  '20': 제휴점
+              Mean:
+                description: 거래수단명 거래수단코드*
+                occurrence: '1'
+                required: required
+                data_type: 50 3
+                format: 코드 체크
+                note: '거래수단명 최대 16자리
+
+                  거래수단코드 참조'
+                attributes:
+                  Code:
+                    type: enum
+                    allowed_values:
+                    - '01'
+                    - '02'
+                    - '03'
+                    - '04'
+                    - '05'
+                    - '06'
+                    - '07'
+                    - '08'
+                    - '09'
+                    - '10'
+                    - '11'
+                    - '12'
+                    - '13'
+                    - '99'
+                    code_reference: 거래수단
+                    code_labels:
+                      '01': 현금
+                      '02': 수표
+                      '03': 주식
+                      '04': 채권
+                      '05': 외환
+                      '06': 대체
+                      '07': 전자화폐
+                      '08': 기타유가증권
+                      '09': 신용카드
+                      '10': 체크카드
+                      '11': 선불카드
+                      '12': 기프트카드
+                      '13': 가상자산
+                      '99': 기타
+                allowed_codes:
+                - '01'
+                - '02'
+                - '03'
+                - '04'
+                - '05'
+                - '06'
+                - '07'
+                - '08'
+                - '09'
+                - '10'
+                - '11'
+                - '12'
+                - '13'
+                - '99'
+                code_reference: 거래수단
+                code_labels:
+                  '01': 현금
+                  '02': 수표
+                  '03': 주식
+                  '04': 채권
+                  '05': 외환
+                  '06': 대체
+                  '07': 전자화폐
+                  '08': 기타유가증권
+                  '09': 신용카드
+                  '10': 체크카드
+                  '11': 선불카드
+                  '12': 기프트카드
+                  '13': 가상자산
+                  '99': 기타
+              Method:
+                description: 거래종류명 거래종류코드*
+                occurrence: '1'
+                required: required
+                data_type: 50 3
+                format: 코드 체크
+                validation_rule_1: 거래종류코드가 '31'(가상자산 매도), '32'(가상자산 매수)인 경우 계좌 정보(<AccountRelation>, <Account>)는 필수여야 함
+                note: 거래종류코드 참조
+                attributes:
+                  Code:
+                    type: enum
+                    allowed_values:
+                    - '01'
+                    - '02'
+                    - '03'
+                    - '04'
+                    - '05'
+                    - '06'
+                    - '07'
+                    - '08'
+                    - '09'
+                    - '10'
+                    - '11'
+                    - '12'
+                    - '13'
+                    - '14'
+                    - '15'
+                    - '16'
+                    - '17'
+                    - '18'
+                    - '19'
+                    - '20'
+                    - '21'
+                    - '22'
+                    - '23'
+                    - '24'
+                    - '25'
+                    - '26'
+                    - '27'
+                    - '28'
+                    - '29'
+                    - '30'
+                    - '31'
+                    - '32'
+                    - '33'
+                    - '34'
+                    - '70'
+                    - '71'
+                    - '99'
+                    code_reference: 거래종류
+                    code_labels:
+                      '01': 입금
+                      '02': 출금
+                      '03': 환전
+                      '04': 영수
+                      '05': 송금
+                      '06': 융자
+                      '07': 상환
+                      '08': 이체영수
+                      '09': 이체송금
+                      '10': 매수
+                      '11': 매도
+                      '12': 입고
+                      '13': 출고
+                      '14': 대체입고
+                      '15': 대체출고
+                      '16': 수표지급
+                      '17': 수표발행
+                      '18': 계약
+                      '19': 해지
+                      '20': 보험료납입
+                      '21': 보험금지급
+                      '22': 지급
+                      '23': 발행
+                      '24': 증권청약
+                      '25': 신용판매(국내)
+                      '26': 현금서비스(국내)
+                      '27': 체크카드결제(국내)
+                      '28': 신용판매(해외)
+                      '29': 현금서비스(해외)
+                      '30': 체크카드결제(해외)
+                      '31': 가상자산 매수
+                      '32': 가상자산 매도
+                      '33': 가상자산 입고
+                      '34': 가상자산 출고
+                      '99': 기타
+                allowed_codes:
+                - '01'
+                - '02'
+                - '03'
+                - '04'
+                - '05'
+                - '06'
+                - '07'
+                - '08'
+                - '09'
+                - '10'
+                - '11'
+                - '12'
+                - '13'
+                - '14'
+                - '15'
+                - '16'
+                - '17'
+                - '18'
+                - '19'
+                - '20'
+                - '21'
+                - '22'
+                - '23'
+                - '24'
+                - '25'
+                - '26'
+                - '27'
+                - '28'
+                - '29'
+                - '30'
+                - '31'
+                - '32'
+                - '33'
+                - '34'
+                - '70'
+                - '71'
+                - '99'
+                code_reference: 거래종류
+                code_labels:
+                  '01': 입금
+                  '02': 출금
+                  '03': 환전
+                  '04': 영수
+                  '05': 송금
+                  '06': 융자
+                  '07': 상환
+                  '08': 이체영수
+                  '09': 이체송금
+                  '10': 매수
+                  '11': 매도
+                  '12': 입고
+                  '13': 출고
+                  '14': 대체입고
+                  '15': 대체출고
+                  '16': 수표지급
+                  '17': 수표발행
+                  '18': 계약
+                  '19': 해지
+                  '20': 보험료납입
+                  '21': 보험금지급
+                  '22': 지급
+                  '23': 발행
+                  '24': 증권청약
+                  '25': 신용판매(국내)
+                  '26': 현금서비스(국내)
+                  '27': 체크카드결제(국내)
+                  '28': 신용판매(해외)
+                  '29': 현금서비스(해외)
+                  '30': 체크카드결제(해외)
+                  '31': 가상자산 매수
+                  '32': 가상자산 매도
+                  '33': 가상자산 입고
+                  '34': 가상자산 출고
+                  '99': 기타
+              Goods:
+                description: 거래상품명 거래상품코드*
+                occurrence: '1'
+                required: required
+                data_type: 50 3
+                format: 코드 체크
+                note: 거래상품코드 참조
+                attributes:
+                  Code: ''
+              MoneyType:
+                description: 통화명 통화종류코드*
+                occurrence: '1'
+                required: required
+                data_type: '- 3'
+                note: 통화코드참조
+                attributes:
+                  Code: ''
+              KRWAmount:
+                description: 원화거래금액
+                occurrence: '1'
+                data_type: numeric(17,2)
+                validation_rule_1: '통화종류가 KRW이고 거래종류코드가 ''99''(기타)가 아닐 경우
+
+                  값은 1이상이어야 함'
+                note: 'default값 : 0'
+              ForeignAmount:
+                description: 외국환거래금액
+                occurrence: '1'
+                data_type: numeric(17,2)
+                validation_rule_1: 통화종류가 KRW가 아니고  거래종류코드가 '99'(기타)가 아닐 경우 값은 1이상이어야 함
+                note: 'default값 : 0'
+              USDAmount:
+                description: 달러화환산금액
+                occurrence: '1'
+                data_type: numeric(17,2)
+                validation_rule_1: 통화종류가 KRW가 아니고  거래종류코드가 '99'(기타)가 아닐 경우 값은 1이상이어야 함
+                note: 'default값 : 0'
+              OrgName:
+                description: 금융기관명 금융기관코드*
+                occurrence: '1'
+                required: required
+                data_type: '- 6'
+                attributes:
+                  Code: ''
+              BranchOffice:
+                description: 지점명 우편번호* 지점코드*
+                occurrence: 0..1
+                required: required required
+                data_type: 50 6 7
+                format: 지점명 금칙어 체크(<,>,",;)
+                validation_rule_2: "거래채널코드가 '02','04','06' \n(자동화기기, 인터넷뱅킹, 콜센터)\n이외의 경우에 필수"
+                note: 'Code(지점코드) : 은행연합회에 등록한 지점코드'
+                attributes:
+                  ZipCode: ''
+                  Code: ''
+              UserRelation:
+                description: 거래에대한 거래자역할
+                occurrence: 1..n
+                validation_rule_1: '<UserRelation>이 여러 번 반복될 때
+
+                  거래역할코드가 중복되면 안됨'
+                children:
+                  RelationRole:
+                    description: 거래자역할 거래자역할코드*
+                    occurrence: '1'
+                    required: required
+                    data_type: '- 10'
+                    format: 코드 체크
+                    note: 거래자역할코드 참조
+                    attributes:
+                      Code: ''
+                  RealNumber:
+                    description: 실명번호 실명번호구분코드*
+                    occurrence: '1'
+                    required: required
+                    data_type: 20 2
+                    format: 코드 체크
+                    attributes:
+                      Code: ''
+                  InsuRelDesc:
+                    description: 거래자역할 기타기재
+                    occurrence: 0..1
+                    data_type: '200'
+              AccountRelation:
+                description: 거래에대한 계좌관계
+                occurrence: 0..n
+                children:
+                  OrgName:
+                    description: 금융기관명 금융기관코드*
+                    occurrence: '1'
+                    required: required
+                    data_type: '- 6'
+                    attributes:
+                      Code: ''
+                  AccountNumber:
+                    description: 계좌번호
+                    occurrence: '1'
+                    required: required
+                    data_type: '30'
+                  AccountRole:
+                    description: 계좌역할 계좌역할코드*
+                    occurrence: '1'
+                    required: required
+                    data_type: '- 2'
+                    format: 코드 체크
+                    attributes:
+                      Code: ''
+              NonAccountRelation:
+                description: 관련계좌존재여부가 "부"일 경우
+                occurrence: 0..1
+                data_type: '1'
+              Securities:
+                description: 유가증권
+                occurrence: 0..n
+                validation_rule_2: '거래수단코드가 ''02'',''04'',''08''(수표,채권,기타유가증권)이거나
+
+                  거래종류코드가 ''16'',''17'',''22'',''23'' (수표지급,수표발행,지급,발행)일 경우 필수'
+              ForeignExchange:
+                description: 거래수단이 외환, 거래종류가 환전일 경우
+                occurrence: 0..1
+                validation_rule_2: '거래수단코드가  ''05''(외환)이거나
+
+                  거래종류코드가 ''03''(환전)일 경우 필수'
+                allowed_codes:
+                - '01'
+                - '02'
+                - '03'
+                - '04'
+                - '05'
+                - '06'
+                - '07'
+                - '08'
+                - '09'
+                - '10'
+                - '11'
+                - '12'
+                - '13'
+                - '14'
+                - '15'
+                - '16'
+                - '17'
+                - '18'
+                - '19'
+                - '20'
+                - '21'
+                - '22'
+                - '23'
+                - '24'
+                - '25'
+                - '26'
+                - '27'
+                - '28'
+                - '29'
+                - '30'
+                - '31'
+                - '32'
+                - '33'
+                - '34'
+                - '70'
+                - '71'
+                - '99'
+                code_reference: 거래종류
+                code_labels:
+                  '01': 입금
+                  '02': 출금
+                  '03': 환전
+                  '04': 영수
+                  '05': 송금
+                  '06': 융자
+                  '07': 상환
+                  '08': 이체영수
+                  '09': 이체송금
+                  '10': 매수
+                  '11': 매도
+                  '12': 입고
+                  '13': 출고
+                  '14': 대체입고
+                  '15': 대체출고
+                  '16': 수표지급
+                  '17': 수표발행
+                  '18': 계약
+                  '19': 해지
+                  '20': 보험료납입
+                  '21': 보험금지급
+                  '22': 지급
+                  '23': 발행
+                  '24': 증권청약
+                  '25': 신용판매(국내)
+                  '26': 현금서비스(국내)
+                  '27': 체크카드결제(국내)
+                  '28': 신용판매(해외)
+                  '29': 현금서비스(해외)
+                  '30': 체크카드결제(해외)
+                  '31': 가상자산 매수
+                  '32': 가상자산 매도
+                  '33': 가상자산 입고
+                  '34': 가상자산 출고
+                  '99': 기타
+              OtherBank:
+                description: 타행계좌
+                occurrence: 0..n
+              Stock:
+                description: 증권
+                occurrence: 0..n
+                validation_rule_2: '거래종류코드가 ''10'' ~ ''15'' (매수,매도,
+
+                  입고,출고,
+
+                  대체입고,대체출고)
+
+                  일 경우 필수'
+              Insurance:
+                description: 보험
+                occurrence: 0..1
+                validation_rule_2: "거래상품코드가 \n'61'~'66'(보험)일 경우 필수"
+          User:
+            description: 거래자
+            occurrence: 1..n
+            children:
+              RealNumber:
+                description: 실명번호 실명번호구분코드*
+                occurrence: '1'
+                required: required
+                data_type: 20 2
+                format: 코드 체크
+                validation_rule_1: '1. 실명번호구분코드가 ''01'',''02'',''03''일 경우 실명번호 Digit 체크
+
+                  2. 실명번호구분코드가 ''08''인 경우 최대 20자리, 아닌 경우 최대 15자리까지 허용'
+                attributes:
+                  Code: ''
+              CINumber:
+                description: CI 번호
+                occurrence: 0..1
+                data_type: '88'
+                validation_rule_2: 실명번호구분코드가 '14'일 경우 필수
+                note: 실명번호구분코드 참조
+              RealNumberTypeName:
+                description: 거래자실명번호구분(기타기재)
+                occurrence: 0..1
+                data_type: '30'
+              Name:
+                description: 성명
+                occurrence: '1'
+                required: required
+                data_type: '60'
+              Nationality:
+                description: 국적 국가코드*
+                occurrence: 0..1
+                required: required
+                data_type: '- 2'
+                validation_rule_2: <UserRelation>의 거래자역할이 '01','02','03','09','10','11','12','13','15','16','17','18'일 경우
+                  필수
+                note: 국가코드참조
+                attributes:
+                  Code: ''
+              Phone:
+                description: 거래자전화번호 핸드폰번호* (법인/단체의 경우, "사업체 전화번호-본점"에 해당)
+                occurrence: 0..1
+                required: optional
+                data_type: 25 25
+                attributes:
+                  HandPhone: ' '
+              Address:
+                description: 주소(자택) 우편번호* (법인/단체의 경우, "사업체 우편번호/주소-본점"에 해당)
+                occurrence: 0..1
+                required: required
+                data_type: 200 6
+                validation_rule_2: '1. <UserRelation>의 거래자역할이 ''01'',''08'', ''11''일 경우
+
+                  자택 또는 직장주소 중 최소 1가지 기재'
+                attributes:
+                  ZipCode: ''
+              AddressCompany:
+                description: 주소(직장) 우편번호*
+                occurrence: 0..1
+                required: required
+                data_type: 200 6
+                attributes:
+                  ZipCode: ''
+                  Code: ''
+              BirthDay:
+                description: 거래자 생년월일/사업체 설립일
+                occurrence: 0..1
+                data_type: '8'
+                format: YYYYMMDD
+              Gender:
+                description: 성별 성별코드*
+                occurrence: 0..1
+                required: required
+                data_type: '- 1'
+                format: 코드 체크
+                note: Code(성별코드) - 남 :1   여:2
+              Company:
+                description: 직장명
+                occurrence: 0..1
+                data_type: '60'
+              DeptName:
+                description: 부서명
+                occurrence: 0..1
+                data_type: '60'
+              Position:
+                description: 직위
+                occurrence: 0..1
+                data_type: '60'
+              CeoName:
+                description: 대표자명
+                occurrence: 0..1
+                data_type: '60'
+              OccupationType:
+                description: 직업구분 직업구분코드*
+                occurrence: 0..1
+                required: required
+                data_type: '- 2'
+                format: 코드 체크
+                validation_rule_2: "<UserRelation>의 \n거래자역할이 '01'이고 \n실명번호구분코드가 \n'01','04','06','07'일 경우  필수"
+                note: 직업구분코드 참조
+                attributes:
+                  Code: ''
+              BizNo:
+                description: 거래자직업내용-사업자등록번호
+                occurrence: 0..1
+                data_type: '15'
+                note: 직업구분코드가 '02' 개인사업자일경우 입력
+              IsHighAsset:
+                description: 고액자산가여부
+                occurrence: 0..1
+                data_type: '1'
+                note: '여 : Y   부 : N'
+              KSIC:
+                description: 업종코드명 업종코드*
+                occurrence: 0..1
+                required: required
+                data_type: '5'
+                note: 표준산업분류코드 참조
+                attributes:
+                  Code: ''
+              BizAddress:
+                description: 사업체 사업장 우편번호/주소 우편번호* (법인/단체의 경우)
+                occurrence: 0..1
+                required: required
+                data_type: 200 6
+                attributes:
+                  ZipCode: ''
+                  Code: ''
+              BizTelNo:
+                description: 사업체 사업장 전화번호 (법인/단체의 경우)
+                occurrence: 0..1
+                data_type: '25'
+              HomepageURL:
+                description: 홈페이지 주소 (법인/단체의 경우)
+                occurrence: 0..1
+                data_type: '200'
+              BizScale:
+                description: 기업규모 기업규모코드* (법인/단체의 경우-법인구분)
+                occurrence: 0..1
+                required: required
+                data_type: '- 2'
+                format: 코드 체크
+                note: 기업규모코드 참조
+                attributes:
+                  Code: ''
+              IsBankingOrgan:
+                description: 금융기관 여부 (법인/단체의 경우-법인구분)
+                occurrence: 0..1
+                data_type: '1'
+                format: '''Y'', ''N'''
+                note: '여 : Y   부 : N'
+              IsNonProfitCorp:
+                description: 비영리법인 여부 (법인/단체의 경우-법인구분)
+                occurrence: 0..1
+                data_type: '1'
+                format: '''Y'', ''N'''
+                note: '여 : Y   부 : N'
+              IsNationalPublicGroup:
+                description: 국가공공단체 여부 (법인/단체의 경우-법인구분)
+                occurrence: 0..1
+                data_type: '1'
+                format: '''Y'', ''N'''
+                note: '여 : Y   부 : N'
+              IsStockList:
+                description: 상장여부 (법인/단체의 경우-법인구분)
+                occurrence: 0..1
+                data_type: '1'
+                format: '''Y'', ''N'''
+                note: '여 : Y   부 : N'
+              StockListInfo:
+                description: 상장정보 (법인/단체의 경우-상장정보)
+                occurrence: 0..1
+          Account:
+            description: 계좌
+            occurrence: 0..n
+            children:
+              OrgName:
+                description: 금융기관명 금융기관코드*
+                occurrence: '1'
+                required: required
+                data_type: '- 6'
+                note: 타행일 경우에 금융기관코드를 모른다면 코드를 'ZZZZZZ'를 입력
+                attributes:
+                  Code: ''
+              BranchOffice:
+                description: 지점명 우편번호* 지점코드*
+                occurrence: 0..1
+                required: required
+                data_type: 30 6 7
+                validation_rule_2: 자행인 경우 필수
+                note: 'Code(지점코드) : 은행연합회에 등록한 지점코드'
+                attributes:
+                  ZipCode: ''
+                  Code: ''
+              AccountNumber:
+                description: 계좌번호
+                occurrence: '1'
+                data_type: '30'
+                validation_rule_1: "지갑주소 입력시 \n대체계좌번호 입력"
+                validation_rule_2: "* 가상자산 매도매수시 계좌번호 필수 \n* 지갑주소 존재시 대체계좌번호 입력 \n(ex:보고문서번호17자리+일련번호5자리)"
+                note: 행별로 다른 값이 필수
+              WaltAdr:
+                description: 가상자산 지갑주소
+                occurrence: 0..1
+                data_type: '500'
+                validation_rule_2: '트래블룰 : 2022.03.25 이후 거래일에 대해 [당타송금/당타수취] & [100만원 이상] &[가상자산 입고/출고] 일때 지갑주소 필수'
+              RegDate:
+                description: 계좌개설일
+                occurrence: 0..1
+                data_type: '8'
+                format: '1. YYYYMMDD
+
+                  2. 1900년 이후일자'
+                validation_rule_2: 자행인 경우 필수
+              AccountUser:
+                description: 계좌주실명번호 실명번호구분코드*
+                occurrence: '1'
+                required: required
+                data_type: 20 2
+                format: 코드 체크
+                validation_rule_1: '1. 실명번호구분코드가 ''01'',''02'',''03''일 경우 실명번호 Digit 체크
+
+                  2. 실명번호구분코드가 ''08''인 경우 최대 20자리, 아닌 경우 최대 15자리까지 허용'
+                attributes:
+                  Code: ' '
+              AccountUserCINumber:
+                description: 계좌주 CI 번호
+                occurrence: 0..1
+                data_type: '88'
+                validation_rule_2: 계좌주 실명번호구분코드가 '14'일 경우 필수
+                note: 실명번호구분코드 참조
+              AgentFlag:
+                description: 대리인존재여부
+                occurrence: '1'
+                required: required
+                data_type: '1'
+                format: '''Y'', ''N'''
+              AgentUser:
+                description: 대리인실명번호 실명번호구분코드*
+                occurrence: 0..1
+                required: required
+                data_type: 20 2
+                format: 코드 체크
+                validation_rule_1: '1. 실명번호구분코드가 ''01'',''02'',''03''일 경우 실명번호 Digit 체크
+
+                  2. 실명번호구분코드가 ''08''인 경우 최대 20자리, 아닌 경우 최대 15자리까지 허용'
+                attributes:
+                  Code: '  '
+              AgentUserCINumber:
+                description: 대리인 CI 번호
+                occurrence: 0..1
+                data_type: '88'
+                validation_rule_2: 대리인 실명번호구분코드가 '14'일 경우 필수
+                note: 실명번호구분코드 참조
+              AccountOpenPurpose:
+                description: 계좌개설목적 계좌개설목적코드*
+                occurrence: 0..1
+                required: required
+                data_type: 100 2
+                format: 코드 체크
+                attributes:
+                  Code: ' '
+          InterUserRelation:
+            description: User간의관계 (대표자,대리인 관계)
+            occurrence: 0..n
+            validation_rule_1: 대표자,대리인의 관계가 존재할 경우 반드시 생성해야 함
+            children:
+              Relation:
+                description: User관계 거래자관계코드*
+                occurrence: '1'
+                required: required
+                data_type: '- 10'
+                format: 코드 체크
+                note: 거래자관계코드 참조('51', '52')
+                attributes:
+                  Code: ''
+              PrincipalUser:
+                description: 거래자, 계좌주, 송/수취계좌주,법인/단체 실명번호구분코드*
+                occurrence: '1'
+                required: required
+                data_type: 20 2
+                format: 코드 체크
+                validation_rule_1: '1. 실명번호구분코드가 ''01'',''02'',''03''일 경우 실명번호 Digit 체크
+
+                  2. 실명번호구분코드가 ''08''인 경우 최대 20자리, 아닌 경우 최대 15자리까지 허용'
+                attributes:
+                  Code: ' '
+              PrincipalUserCINumber:
+                description: 거래자, 계좌주, 송/수취계좌주,법인/단체 CI 번호
+                occurrence: 0..1
+                data_type: '88'
+                validation_rule_2: 실명번호구분코드가 '14'일 경우 필수
+                note: 실명번호구분코드 참조
+              ParticipantUser:
+                description: 관계인 실명번호구분코드*
+                occurrence: '1'
+                required: required
+                data_type: 20 2
+                format: 코드 체크
+                validation_rule_1: '1. 실명번호구분코드가 ''01'',''02'',''03''일 경우 실명번호 Digit 체크
+
+                  2. 실명번호구분코드가 ''08''인 경우 최대 20자리, 아닌 경우 최대 15자리까지 허용'
+                attributes:
+                  Code: ' '
+              ParticipantUserCINumber:
+                description: 관계인 CI 번호
+                occurrence: 0..1
+                data_type: '88'
+                validation_rule_2: 실명번호구분코드가 '14'일 경우 필수
+                note: 실명번호구분코드 참조
+              Remark:
+                description: 관계명
+                occurrence: 0..1
+                data_type: '100'
+                format: 금칙어 체크(<,>,",;)
+                validation_rule_2: "거래자관계코드가 \n'52'대리인일 경우 필수"
+                note: 거래자와관계 코드명
+      FileAttach:
+        description: 첨부파일
+        occurrence: 0..n
+        children:
+          FileName:
+            description: 첨부파일명 정형화된 파일여부*
+            occurrence: '1'
+            required: required
+            format: "파일명 금칙어 체크(<,>,\",;)\n Code = 'Y' or 'N'"
+            note: '여 : Y   부 : N'
+            attributes:
+              Code: ''
+          Body:
+            description: 첨부파일(base64인코딩)
+            occurrence: '1'
+code_values:
+  메시지타입코드:
+    '01':
+      general: 보고
+      card: 보고
+    '04':
+      general: 재보고
+      card: 재보고
+    '96':
+      general: 모의보고-재보고
+      card: 모의보고-재보고
+    '99':
+      general: 모의보고-보고
+      card: 모의보고-보고
+  실명번호구분:
+    '01':
+      general: 주민등록번호(개인)
+      card: 주민등록번호(개인)
+    '02':
+      general: 주민등록번호(기타단체)
+      card: 주민등록번호(기타단체)
+    '03':
+      general: 사업자등록번호
+      card: 사업자등록번호
+    '04':
+      general: 여권번호
+      card: 여권번호
+    '05':
+      general: 법인등록번호
+      card: 법인등록번호
+    '06':
+      general: 외국인등록번호
+      card: 외국인등록번호
+    '07':
+      general: 국내거소신고번호
+      card: 국내거소신고번호
+    '08':
+      general: 투자등록번호/LEI
+      card: 투자등록번호/LEI
+    '09':
+      general: 고유번호/납세번호
+      card: 고유번호/납세번호
+    '11':
+      general: BIC코드(SWIFT)
+      card: BIC코드(SWIFT)
+    '12':
+      general: 해당국가법인번호
+      card: 해당국가법인번호
+    '14':
+      general: CI번호
+      card: CI번호
+    '99':
+      general: 기타
+      card: 기타
+  직업구분:
+    '01':
+      general: 직장인
+      card: 직장인
+    '02':
+      general: 개인사업자
+      card: 개인사업자
+    '03':
+      general: 무직
+      card: 무직
+    '91':
+      general: 파악할 수 없음
+      card: 파악할 수 없음
+    '99':
+      general: 기타
+      card: 기타
+  거래역할:
+    '01':
+      general: 의심거래자
+      card: 의심거래자
+    '02':
+      general: 의심거래자 대표자
+      card: 의심거래자 대표자
+    '03':
+      general: 거래대리인
+      card: 거래대리인
+    '08':
+      general: 관련계좌 개설자
+    '09':
+      general: 관련계좌 개설 대리인
+    '10':
+      general: 관련계좌 개설 대표자
+    '11':
+      general: 당행송수취 계좌개설자
+    '12':
+      general: 당행송수취 계좌개설 대리인
+    '13':
+      general: 당행송수취 계좌개설 대표자
+    '15':
+      general: 주피보험자
+    '16':
+      general: 종피보험자
+    '17':
+      general: 수익자
+    '18':
+      general: 모집인(중개인)
+  거래자관계:
+    '51':
+      general: 대표자
+      card: 대표자
+    '52':
+      general: 대리인
+      card: 대리인
+    '99':
+      general: 기타
+      card: 기타
+  거래채널:
+    '01':
+      general: 창구
+    '02':
+      general: 자동화기기
+    '03':
+      general: PB센터
+    '04':
+      general: 인터넷뱅킹
+    '05':
+      general: 전화/휴대전화
+    '06':
+      general: 콜센터
+    '07':
+      general: 대출모집인
+    '08':
+      general: 보험설계사
+    '09':
+      general: 보험대리점
+    '10':
+      general: 보험중개사
+    '11':
+      general: 방카슈랑스
+    '13':
+      general: 환전창구
+    '14':
+      general: 캐싱창구
+    '15':
+      general: 딜러
+    '16':
+      general: HTS/MTS/WTS
+    '17':
+      general: 가맹점
+    '18':
+      general: 카드모집인
+    '19':
+      general: 모바일
+    '20':
+      general: 제휴점
+    '70':
+      card: 출납창구
+    '71':
+      card: 게임테이블
+    '99':
+      card: 기타
+  거래수단:
+    '01':
+      general: 현금
+      card: 현금
+    '02':
+      general: 수표
+      card: 수표
+    '03':
+      general: 주식
+    '04':
+      general: 채권
+    '05':
+      general: 외환
+    '06':
+      general: 대체
+    '07':
+      general: 전자화폐
+    '08':
+      general: 기타유가증권
+    '09':
+      general: 신용카드
+    '10':
+      general: 체크카드
+    '11':
+      general: 선불카드
+    '12':
+      general: 기프트카드
+    '13':
+      general: 가상자산
+    '99':
+      general: 기타
+      card: 기타
+  거래종류:
+    '01':
+      general: 입금
+    '02':
+      general: 출금
+    '03':
+      general: 환전
+    '04':
+      general: 영수
+    '05':
+      general: 송금
+    '06':
+      general: 융자
+    '07':
+      general: 상환
+    '08':
+      general: 이체영수
+    '09':
+      general: 이체송금
+    '10':
+      general: 매수
+    '11':
+      general: 매도
+    '12':
+      general: 입고
+    '13':
+      general: 출고
+    '14':
+      general: 대체입고
+    '15':
+      general: 대체출고
+    '16':
+      general: 수표지급
+    '17':
+      general: 수표발행
+    '18':
+      general: 계약
+    '19':
+      general: 해지
+    '20':
+      general: 보험료납입
+    '21':
+      general: 보험금지급
+    '22':
+      general: 지급
+    '23':
+      general: 발행
+    '24':
+      general: 증권청약
+    '25':
+      general: 신용판매(국내)
+    '26':
+      general: 현금서비스(국내)
+    '27':
+      general: 체크카드결제(국내)
+    '28':
+      general: 신용판매(해외)
+    '29':
+      general: 현금서비스(해외)
+    '30':
+      general: 체크카드결제(해외)
+    '31':
+      general: 가상자산 매수
+    '32':
+      general: 가상자산 매도
+    '33':
+      general: 가상자산 입고
+    '34':
+      general: 가상자산 출고
+    '70':
+      card: 칩스구매
+    '71':
+      card: 칩스환전
+    '99':
+      general: 기타
+      card: 기타
+  ? '거래상품
+
+
+    게임상품
+
+    (카지노)'
+  : '01':
+      general: 수시입출금 예금
+    '02':
+      general: 적립식 예금
+    '03':
+      general: 거치식 예금
+    '11':
+      general: 신탁
+    '12':
+      general: 투자신탁
+    '21':
+      general: 주식(장내)
+    '22':
+      general: 주식(장외)
+    '23':
+      general: CMA
+    '24':
+      general: Wrap
+    '25':
+      general: 증권저축
+    '26':
+      general: 퇴직연금
+    '27':
+      general: 주식(해외)
+    '28':
+      general: 주식종합계좌
+    '30':
+      general: 가상자산
+    '31':
+      general: 채권(기명)
+    '32':
+      general: 채권(무기명)
+    '41':
+      general: 대출(담보)
+    '42':
+      general: 대출(신용)
+    '51':
+      general: 파생(선물)
+    '52':
+      general: 파생(옵션)
+    '53':
+      general: 파생(스왑)
+    '59':
+      general: 파생(기타)기재
+    '61':
+      general: 보험(보장)
+    '62':
+      general: 보험(연금)
+    '63':
+      general: 보험(저축)
+    '64':
+      general: 보험(투자)
+    '65':
+      general: 보험(일반손해)
+    '66':
+      general: 보험(재보험)
+    '67':
+      general: 할부금융
+    '68':
+      general: 리스
+    '69':
+      general: 금현물
+    '70':
+      card: 블랙잭
+    '71':
+      card: 룰렛
+    '72':
+      card: 바카라
+    '73':
+      card: 다이사이
+    '74':
+      card: 슬롯머신
+    '75':
+      card: 비디오포커
+    '76':
+      card: 케리비언포커
+    '77':
+      card: 파이고우포커
+    '78':
+      card: 렛잇라이드포커
+    '79':
+      card: 키노
+    '80':
+      card: 빅휠
+    '81':
+      card: 빠이까우
+    '82':
+      card: 판탄
+    '83':
+      card: 죠커세븐
+    '84':
+      card: 라운드크랩스
+    '85':
+      card: 마작
+    '86':
+      card: 프랜치볼
+    '87':
+      card: 챠카락
+    '88':
+      card: 트란타콰란타
+    '91':
+      general: 해당사항 없음
+      card: 해당사항 없음
+    '99':
+      general: 기타
+      card: 기타
+  유가증권종류:
+    '01':
+      general: 환어음
+    '02':
+      general: 약속어음
+    '03':
+      general: 국채
+    '04':
+      general: 공채
+    '05':
+      general: 자기앞수표
+      card: 자기앞수표
+    '06':
+      general: 당좌수표
+    '07':
+      general: 가계당좌수표
+    '08':
+      general: 국고수표
+    '09':
+      general: 양도성예금증서
+    '10':
+      general: 여행자수표
+    '99':
+      general: 기타
+      card: 기타
+  발행인/최종소지인구분:
+    '1':
+      general: 발행자
+      card: 발행자
+    '3':
+      general: 최종소지인
+      card: 최종소지인
+  외환거래목적:
+    '01':
+      general: 증여송금
+    '02':
+      general: 여행경비
+    '03':
+      general: 유학경비
+    '04':
+      general: 해외체제비
+    '05':
+      general: 해외이주비
+    '06':
+      general: 외화예금
+    '07':
+      general: 해외직접투자
+    '08':
+      general: 무역거래
+    '09':
+      general: 무역외거래
+    '91':
+      general: 알수없음
+    '99':
+      general: 기타
+  보험료납입방법:
+    '01':
+      general: 일시납
+    '02':
+      general: 연납
+    '03':
+      general: 선납/완납
+    '04':
+      general: 환불/취소
+    '05':
+      general: 월납
+    '99':
+      general: 기타
+  계좌주구분:
+    '01':
+      general: 개인
+    '02':
+      general: 법인
+    '91':
+      general: 알수없음
+    '99':
+      general: 기타
+  계좌유형구분:
+    '01':
+      general: 관련계좌
+    '02':
+      general: 송/수취계좌
+  거래목적:
+    '01':
+      general: 물품등사업상 대금결제
+    '02':
+      general: 차입 등 부채상환
+    '03':
+      general: 상속증여성거래
+    '99':
+      general: 기타(기재)
+  추정자산규모:
+    '01':
+      general: 10억원 미만
+    '02':
+      general: 10억원이상 100억원 미만
+    '03':
+      general: 100억원이상 1000억원 미만
+    '04':
+      general: 1000억원 이상
+  계좌개설목적:
+    '01':
+      general: 급여 및 생활비
+    '02':
+      general: 저축 및 투자
+    '03':
+      general: 보험료납부 결제
+    '04':
+      general: 공과금납부 결제
+    '05':
+      general: 카드대금 결제
+    '06':
+      general: 대출원리금 상환 결제
+    '07':
+      general: 사업상거래
+    '08':
+      general: 보장
+    '09':
+      general: 상속
+    '99':
+      general: 기타(기재)
+  ? '상장구분
+
+    서식3면'
+  : '01':
+      general: 유가증권시장
+    '02':
+      general: 코스닥시장
+    '03':
+      general: 뉴욕증권거래소
+    '04':
+      general: NASDAQ
+    '05':
+      general: 런던증권거래소
+    '06':
+      general: 홍콩증권거래소
+    '99':
+      general: 기타(기재)
+  거래자와 관계:
+    '02':
+      general: 부모
+    '03':
+      general: 배우자
+    '04':
+      general: 자녀
+    '05':
+      general: 형제
+      card: 형제자매
+    '07':
+      general: 친지
+      card: 친척
+    '08':
+      general: 직장동료
+      card: 동료(친구)
+    '12':
+      general: 상사
+    '98':
+      general: 알수없음
+    '99':
+      general: 기타(기재)
+    '70':
+      card: 카지노관광 알선업자
+    '71':
+      card: 여행가이드
+    '72':
+      card: 직원
+  기업규모코드:
+    '01':
+      general: 대기업
+    '02':
+      general: 중소기업
+  '* 참고 : 가상자산의 통화코드는 "VAS"로 함': {}
+  의심거래유형코드:
+    '100':
+      description: 의심스러운 거래자의 태도 및 특징관련
+      card_description: 의심스러운 거래자의 태도 및 특징관련
+      sub_codes:
+        '101':
+          description: 실명노출 기피 또는 거래에 대한 비밀요구
+          card_description: 실명노출 기피 또는 거래에 대한 비밀요구
+        '102':
+          description: 거래에 대한 합당한 답변 불제공 또는 자금출처가 불분명한 거래
+          card_description: 거래에 대한 합당한 답변 불제공 또는 자금출처가 불분명한 거래
+        '103':
+          description: 업력이나 업체규모, 개인능력에 비해 과다한 거래실적
+        '104':
+          description: 언행, 행색과 거래금액간의 부조화
+        '105':
+          description: 중요인물 관련거래
+        '106':
+          description: 어색하고 불안한 태도 및 언행
+        '107':
+          description: 사전거래가 없는 고객의 의심스러운 거래 요청
+        '108':
+          description: 의심스러운 동행자 참여거래
+          card_description: 의심스러운 동행자 참여거래
+        '109':
+          description: 불특정다수와의 거래
+        '110':
+          description: 계약자 또는 수익자의 빈번하거나 갑작스런 변경
+        '171':
+          card_description: 직원에게 뇌물 제공 또는 영향력 행사
+        '172':
+          card_description: 비정상적인 베팅
+        '173':
+          card_description: 게임 미참여 또는 최소한의 게임참여
+        '174':
+          card_description: 여러 금융기관 발행 지불수단 사용
+        '175':
+          card_description: 다양한 종류의 지불수단 교환 요청
+        '176':
+          card_description: 거액의 소액권을 고액권으로 교환 요청
+        '177':
+          card_description: 다양한 권종의 수표발행 요청
+    '200':
+      description: 거래유형 관련
+      card_description: 거래유형 관련
+      sub_codes:
+        '201':
+          description: 갑작스러운 거래패턴의 변화
+        '202':
+          description: 원격지 거래
+        '203':
+          description: 교환거래
+        '204':
+          description: 분할거래
+          card_description: 분할거래
+        '206':
+          description: 현금에 집착하는 거래
+        '207':
+          description: 거액 입금 후 당일 또는 익일 중 인출
+        '210':
+          description: 무기명증서(무기명채권, CD, CP등) 관련거래
+        '211':
+          description: 계좌개설없이 거액의 환전요구 또는 외국으로의 송금
+        '212':
+          description: 의심스러운 담보대출 또는 보험계약 즉시 약관대출
+        '213':
+          description: 주금 납입거래 또는 예금잔액증명서 발급(요청)
+        '214':
+          description: 다중거래의 동시요청
+        '215':
+          description: 빈번한 입출금(입출고)
+        '216':
+          description: 의심스러운 대여금고 또는 보호예수 거래
+        '217':
+          description: 법인자산 또는 타인자산 담보 거래
+        '218':
+          description: 무관업종 또는 의심스런 재산에 대한 보험청약 거래
+        '226':
+          description: 테러자금으로 의심되는 거래
+        '271':
+          card_description: Cut-off 시간 전후의 분할거래
+        '272':
+          card_description: 타인명의 거래
+        '273':
+          card_description: 거액의 칩스 미교환 반출
+        '274':
+          card_description: 칩스 교환금액이 칩스 구매금액과 게임수익금액의 합계액 이상인 경우
+    '300':
+      description: 금융사고 또는 긴급조사가 요청되는 사건 관련
+      card_description: 금융사고 또는 긴급조사가 요청되는 사건 관련
+      sub_codes:
+        '301':
+          description: 금융사고 등 거액횡령이 의심되는 거래
+          card_description: 금융사고 등 거액횡령이 의심되는 거래
+        '302':
+          description: 뇌물공여 및 뇌물수수 등이 의심되는 거래
+          card_description: 뇌물공여 및 뇌물수수 등이 의심되는 거래
+        '303':
+          description: 거액의 외화도피로 추정되는 거래
+          card_description: 거액의 외화도피로 추정되는 거래
+        '304':
+          description: 조직범죄 및 강.절도 등 강력사건 연루가 의심되는 거래
+          card_description: 조직범죄 및 강.절도 등 강력사건 연루가 의심되는 거래
+        '305':
+          description: 테러자금으로 의심되는 거래
+        '306':
+          description: 기타 사회통념상 긴급조사(우선조사)가 요망되는 거래
+          card_description: 기타 사회통념상 긴급조사(우선조사)가 요망되는 거래
+        '307':
+          description: 수사기관으로부터 자료제공 요청을 받은 거래
+        '371':
+          card_description: 서명위조 또는 위변조된 신분증 제시
+        '372':
+          card_description: 위조된 지불수단 사용
+    '400':
+      description: 계좌정보 관련
+      sub_codes:
+        '401':
+          description: 타인의 명의 또는 계좌의 이용 (다수계좌여부-여)
+        '402':
+          description: 타인의 명의 또는 계좌의 이용 (다수계좌여부-부)
+        '403':
+          description: 특별한 사유없이 복수의 계좌개설 (계좌주 동일 여부 - 여)
+        '404':
+          description: 특별한 사유없이 복수의 계좌개설 (계좌주 동일 여부 - 부)
+        '405':
+          description: 의심스러운 계약/계좌 해지
+        '406':
+          description: 단발성 계좌의 이용

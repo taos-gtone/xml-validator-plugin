@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="EUC-KR"?>
+<str:STR xmlns:str="http://www.kofiu.go.kr/str" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.kofiu.go.kr/str" Version="5.0" Code="BA">
+	<Organization>
+		<OrgName Code="AB0001">샘플금융기관</OrgName>
+		<MainAuthor Userid="sample01">보고담당자</MainAuthor>
+		<Manager>보고책임자</Manager>
+		<Phone>02-1234-5678</Phone>
+		<Address ZipCode="12345">서울특별시 중구 샘플로 100</Address>
+		<Email>sample@sample.co.kr</Email>
+	</Organization>
+	<Master>
+		<FiuDocNum>AB000120240100003</FiuDocNum>
+		<FormerFiuDocNum/>
+		<StartDate>20240101</StartDate>
+		<EndDate>20240131</EndDate>
+		<InnerCount>3</InnerCount>
+		<OuterCount>2</OuterCount>
+		<InnerKRWAmount>150000000</InnerKRWAmount>
+		<OuterKRWAmount>80000000</OuterKRWAmount>
+		<InnerUSDAmount>0</InnerUSDAmount>
+		<OuterUSDAmount>0</OuterUSDAmount>
+		<Count>5</Count>
+		<KRWAmount>230000000</KRWAmount>
+		<USDAmount>0</USDAmount>
+		<MessageTypeCode>01</MessageTypeCode>
+		<DocSendDate>20240201</DocSendDate>
+		<Suspicion>
+			<QuestionTitle Code="100">
+				<Question Code="103">업력이나 업체규모, 개인능력에 비해 과다한 거래실적</Question>
+			</QuestionTitle>
+			<QuestionTitle Code="200">
+				<Question Code="207">거액 입금 후 당일 또는 익일 중 인출</Question>
+				<Question Code="215">빈번한 입출금(입출고)</Question>
+			</QuestionTitle>
+		</Suspicion>
+		<SuspicionReport>
+			<Who>법인 의심거래자 정보</Who>
+			<When>2024년 1월</When>
+			<Where>샘플금융기관 본점 및 강남지점</Where>
+			<What>법인 계좌 다수 입출금</What>
+			<How>창구 및 인터넷뱅킹 거래</How>
+			<Why>법인 규모 대비 과다한 거래금액 및 빈번한 입출금으로 의심됨</Why>
+			<SyntheticOpinion>법인의 업력 및 규모 대비 과다한 거래금액이 다수 발생하고 입금 후 단기간 내 출금이 반복되어 의심거래로 판단됨</SyntheticOpinion>
+			<BranchOfficeScore>4</BranchOfficeScore>
+			<OrgScore>5</OrgScore>
+			<RelationFiuDocNum/>
+			<EtcPecularityType/>
+		</SuspicionReport>
+	</Master>
+	<Detail>
+		<Transaction>
+			<Seq>1</Seq>
+			<Date>20240105</Date>
+			<Time>093000</Time>
+			<Channel Code="01">창구</Channel>
+			<Mean Code="01">현금</Mean>
+			<Method Code="01">입금</Method>
+			<Goods Code="01">수시입출금 예금</Goods>
+			<MoneyType Code="KRW">한국 원</MoneyType>
+			<KRWAmount>50000000</KRWAmount>
+			<ForeignAmount>0</ForeignAmount>
+			<USDAmount>0</USDAmount>
+			<OrgName Code="AB0001">샘플금융기관</OrgName>
+			<BranchOffice ZipCode="12345" Code="0000001">본점</BranchOffice>
+			<UserRelation>
+				<RelationRole Code="01">의심거래자</RelationRole>
+				<RealNumber Code="03">1234567890</RealNumber>
+				<InsuRelDesc/>
+			</UserRelation>
+			<AccountRelation>
+				<OrgName Code="AB0001">샘플금융기관</OrgName>
+				<AccountNumber>9876543210123</AccountNumber>
+				<AccountRole Code="01">관련계좌</AccountRole>
+			</AccountRelation>
+		</Transaction>
+		<Transaction>
+			<Seq>2</Seq>
+			<Date>20240105</Date>
+			<Time>153000</Time>
+			<Channel Code="01">창구</Channel>
+			<Mean Code="01">현금</Mean>
+			<Method Code="02">출금</Method>
+			<Goods Code="01">수시입출금 예금</Goods>
+			<MoneyType Code="KRW">한국 원</MoneyType>
+			<KRWAmount>30000000</KRWAmount>
+			<ForeignAmount>0</ForeignAmount>
+			<USDAmount>0</USDAmount>
+			<OrgName Code="AB0001">샘플금융기관</OrgName>
+			<BranchOffice ZipCode="12345" Code="0000001">본점</BranchOffice>
+			<UserRelation>
+				<RelationRole Code="01">의심거래자</RelationRole>
+				<RealNumber Code="03">1234567890</RealNumber>
+				<InsuRelDesc/>
+			</UserRelation>
+			<AccountRelation>
+				<OrgName Code="AB0001">샘플금융기관</OrgName>
+				<AccountNumber>9876543210123</AccountNumber>
+				<AccountRole Code="01">관련계좌</AccountRole>
+			</AccountRelation>
+		</Transaction>
+		<Transaction>
+			<Seq>3</Seq>
+			<Date>20240115</Date>
+			<Time>101500</Time>
+			<Channel Code="04">인터넷뱅킹</Channel>
+			<Mean Code="06">대체</Mean>
+			<Method Code="01">입금</Method>
+			<Goods Code="01">수시입출금 예금</Goods>
+			<MoneyType Code="KRW">한국 원</MoneyType>
+			<KRWAmount>70000000</KRWAmount>
+			<ForeignAmount>0</ForeignAmount>
+			<USDAmount>0</USDAmount>
+			<OrgName Code="AB0001">샘플금융기관</OrgName>
+			<UserRelation>
+				<RelationRole Code="01">의심거래자</RelationRole>
+				<RealNumber Code="03">1234567890</RealNumber>
+				<InsuRelDesc/>
+			</UserRelation>
+			<AccountRelation>
+				<OrgName Code="AB0001">샘플금융기관</OrgName>
+				<AccountNumber>9876543210123</AccountNumber>
+				<AccountRole Code="01">관련계좌</AccountRole>
+			</AccountRelation>
+		</Transaction>
+		<Transaction>
+			<Seq>4</Seq>
+			<Date>20240116</Date>
+			<Time>140000</Time>
+			<Channel Code="01">창구</Channel>
+			<Mean Code="01">현금</Mean>
+			<Method Code="02">출금</Method>
+			<Goods Code="01">수시입출금 예금</Goods>
+			<MoneyType Code="KRW">한국 원</MoneyType>
+			<KRWAmount>50000000</KRWAmount>
+			<ForeignAmount>0</ForeignAmount>
+			<USDAmount>0</USDAmount>
+			<OrgName Code="AB0001">샘플금융기관</OrgName>
+			<BranchOffice ZipCode="06234" Code="0000002">강남지점</BranchOffice>
+			<UserRelation>
+				<RelationRole Code="01">의심거래자</RelationRole>
+				<RealNumber Code="03">1234567890</RealNumber>
+				<InsuRelDesc/>
+			</UserRelation>
+			<AccountRelation>
+				<OrgName Code="AB0001">샘플금융기관</OrgName>
+				<AccountNumber>9876543210123</AccountNumber>
+				<AccountRole Code="01">관련계좌</AccountRole>
+			</AccountRelation>
+		</Transaction>
+		<Transaction>
+			<Seq>5</Seq>
+			<Date>20240125</Date>
+			<Time>111500</Time>
+			<Channel Code="01">창구</Channel>
+			<Mean Code="01">현금</Mean>
+			<Method Code="01">입금</Method>
+			<Goods Code="01">수시입출금 예금</Goods>
+			<MoneyType Code="KRW">한국 원</MoneyType>
+			<KRWAmount>30000000</KRWAmount>
+			<ForeignAmount>0</ForeignAmount>
+			<USDAmount>0</USDAmount>
+			<OrgName Code="AB0001">샘플금융기관</OrgName>
+			<BranchOffice ZipCode="12345" Code="0000001">본점</BranchOffice>
+			<UserRelation>
+				<RelationRole Code="01">의심거래자</RelationRole>
+				<RealNumber Code="03">1234567890</RealNumber>
+				<InsuRelDesc/>
+			</UserRelation>
+			<AccountRelation>
+				<OrgName Code="AB0001">샘플금융기관</OrgName>
+				<AccountNumber>9876543210123</AccountNumber>
+				<AccountRole Code="01">관련계좌</AccountRole>
+			</AccountRelation>
+		</Transaction>
+		<User>
+			<RealNumber Code="03">1234567890</RealNumber>
+			<RealNumberTypeName>사업자등록번호</RealNumberTypeName>
+			<Name>샘플주식회사</Name>
+			<Nationality Code="KR">대한민국</Nationality>
+			<Phone HandPhone="">02-9876-5432</Phone>
+			<Address ZipCode="06234">서울특별시 강남구 테헤란로 123</Address>
+			<BirthDay>20100315</BirthDay>
+			<CeoName>김대표</CeoName>
+			<KSIC Code="46499">기타 상품 도매업</KSIC>
+			<BizAddress ZipCode="06234">서울특별시 강남구 테헤란로 123</BizAddress>
+			<BizTelNo>02-9876-5432</BizTelNo>
+			<HomepageURL>http://www.samplecorp.co.kr</HomepageURL>
+			<BizScale Code="02">중소기업</BizScale>
+			<IsBankingOrgan>N</IsBankingOrgan>
+			<IsNonProfitCorp>N</IsNonProfitCorp>
+			<IsNationalPublicGroup>N</IsNationalPublicGroup>
+			<IsStockList>N</IsStockList>
+		</User>
+		<Account>
+			<OrgName Code="AB0001">샘플금융기관</OrgName>
+			<BranchOffice ZipCode="12345" Code="0000001">본점</BranchOffice>
+			<AccountNumber>9876543210123</AccountNumber>
+			<RegDate>20200601</RegDate>
+			<AccountUser Code="03">1234567890</AccountUser>
+			<AgentFlag>N</AgentFlag>
+		</Account>
+	</Detail>
+	<FileAttach/>
+</str:STR>

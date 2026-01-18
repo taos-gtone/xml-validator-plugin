@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="EUC-KR"?>
+<str:STR xmlns:str="http://www.kofiu.go.kr/str" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.kofiu.go.kr/str" Version="5.0" Code="BA">
+	<Organization>
+		<OrgName Code="AB0001">샘플금융기관</OrgName>
+		<MainAuthor Userid="sample01">보고담당자</MainAuthor>
+		<Manager>보고책임자</Manager>
+		<Phone>02-1234-5678</Phone>
+		<Address ZipCode="12345">서울특별시 중구 샘플로 100</Address>
+		<Email>sample@sample.co.kr</Email>
+	</Organization>
+	<Master>
+		<FiuDocNum>AB000120240100001</FiuDocNum>
+		<FormerFiuDocNum/>
+		<StartDate>20240101</StartDate>
+		<EndDate>20240131</EndDate>
+		<InnerCount>1</InnerCount>
+		<OuterCount>0</OuterCount>
+		<InnerKRWAmount>1000000</InnerKRWAmount>
+		<OuterKRWAmount>0</OuterKRWAmount>
+		<InnerUSDAmount>0</InnerUSDAmount>
+		<OuterUSDAmount>0</OuterUSDAmount>
+		<Count>1</Count>
+		<KRWAmount>1000000</KRWAmount>
+		<USDAmount>0</USDAmount>
+		<MessageTypeCode>01</MessageTypeCode>
+		<DocSendDate>20240201</DocSendDate>
+		<Suspicion>
+			<QuestionTitle Code="100">
+				<Question Code="101">실명노출 기피 또는 거래에 대한 비밀요구</Question>
+			</QuestionTitle>
+			<QuestionTitle Code="200">
+				<Question Code="207">거액 입금 후 당일 또는 익일 중 인출</Question>
+			</QuestionTitle>
+		</Suspicion>
+		<SuspicionReport>
+			<Who>의심거래자 정보</Who>
+			<When>2024년 1월 15일</When>
+			<Where>샘플금융기관 본점</Where>
+			<What>현금 입금</What>
+			<How>창구 거래</How>
+			<Why>거래 패턴이 일반적이지 않아 의심됨</Why>
+			<SyntheticOpinion>고객의 거래 패턴이 일반적인 금융거래 양식과 상이하여 의심거래로 판단됨</SyntheticOpinion>
+			<BranchOfficeScore>3</BranchOfficeScore>
+			<OrgScore>3</OrgScore>
+			<RelationFiuDocNum/>
+			<EtcPecularityType/>
+		</SuspicionReport>
+	</Master>
+	<Detail>
+		<Transaction>
+			<Seq>1</Seq>
+			<Date>20240115</Date>
+			<Time>143000</Time>
+			<Channel Code="01">창구</Channel>
+			<Mean Code="01">현금</Mean>
+			<Method Code="01">입금</Method>
+			<Goods Code="01">수시입출금 예금</Goods>
+			<MoneyType Code="KRW">한국 원</MoneyType>
+			<KRWAmount>1000000</KRWAmount>
+			<ForeignAmount>0</ForeignAmount>
+			<USDAmount>0</USDAmount>
+			<OrgName Code="AB0001">샘플금융기관</OrgName>
+			<BranchOffice ZipCode="12345" Code="0000001">본점</BranchOffice>
+			<UserRelation>
+				<RelationRole Code="01">의심거래자</RelationRole>
+				<RealNumber Code="01">9001011234567</RealNumber>
+				<InsuRelDesc/>
+			</UserRelation>
+			<AccountRelation>
+				<OrgName Code="AB0001">샘플금융기관</OrgName>
+				<AccountNumber>1234567890123</AccountNumber>
+				<AccountRole Code="01">관련계좌</AccountRole>
+			</AccountRelation>
+		</Transaction>
+		<User>
+			<RealNumber Code="01">9001011234567</RealNumber>
+			<RealNumberTypeName>주민등록번호(개인)</RealNumberTypeName>
+			<Name>홍길동</Name>
+			<Nationality Code="KR">대한민국</Nationality>
+			<Phone HandPhone="010-1234-5678">02-1234-5678</Phone>
+			<Address ZipCode="12345">서울특별시 강남구 샘플로 200</Address>
+			<BirthDay>19900101</BirthDay>
+			<Gender Code="1">남</Gender>
+			<OccupationType Code="01">직장인</OccupationType>
+		</User>
+		<Account>
+			<OrgName Code="AB0001">샘플금융기관</OrgName>
+			<BranchOffice ZipCode="12345" Code="0000001">본점</BranchOffice>
+			<AccountNumber>1234567890123</AccountNumber>
+			<RegDate>20230101</RegDate>
+			<AccountUser Code="01">9001011234567</AccountUser>
+			<AgentFlag>N</AgentFlag>
+		</Account>
+	</Detail>
+	<FileAttach/>
+</str:STR>

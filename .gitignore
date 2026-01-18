@@ -1,0 +1,35 @@
+# Eclipse 관련
+.classpath
+.project
+.settings/
+bin/
+.buildpath
+.target
+
+# 빌드 산출물
+*.class
+*.jar
+*.war
+*.ear
+
+# 라이브러리 (필요시 Maven/Gradle로 관리)
+lib/*.jar
+
+# 운영체제 관련
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# 임시 파일
+*.tmp
+*.log
+*.bak
+
+# Eclipse 실행 환경
+.metadata/
+.recommenders/
+
+# Java
+*.class
