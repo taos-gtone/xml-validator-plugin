@@ -155,6 +155,27 @@ public class ConsistencyValidator {
 			if (strRule != null) {
 				System.out.println("STR 규칙 키: " + strRule.keySet());
 				
+				// STR 규칙의 attributes 확인
+				@SuppressWarnings("unchecked")
+				Map<String, Object> strAttributes = (Map<String, Object>) strRule.get("attributes");
+				System.out.println("STR attributes 규칙 존재 여부: " + (strAttributes != null));
+				if (strAttributes != null) {
+					System.out.println("STR attributes 규칙 키: " + strAttributes.keySet());
+					if (strAttributes.containsKey("Code")) {
+						@SuppressWarnings("unchecked")
+						Map<String, Object> codeRule = (Map<String, Object>) strAttributes.get("Code");
+						System.out.println("STR Code 속성 규칙: " + codeRule);
+						if (codeRule != null) {
+							System.out.println("STR Code 속성 규칙 타입: " + codeRule.get("type"));
+							System.out.println("STR Code 속성 허용값: " + codeRule.get("allowed_values"));
+						}
+					} else {
+						System.err.println("경고: STR attributes에 Code 규칙이 없습니다!");
+					}
+				} else {
+					System.err.println("경고: STR attributes 규칙이 없습니다!");
+				}
+				
 				// children 규칙 확인
 				Map<String, Object> children = (Map<String, Object>) strRule.get("children");
 				if (children != null) {
@@ -419,16 +440,237 @@ public class ConsistencyValidator {
 	}
 	
 	/**
+	 * 속성의 라인 번호를 찾습니다.
+	 */
+	private int findAttributeLineNumber(File xmlFile, Element element, String path, String attrName, String encoding) {
+		// 요소 이름 가져오기 (네임스페이스 처리) - 변수 스코프를 위해 메서드 시작 부분에서 선언
+		String elementName = element.getLocalName();
+		String elementNodeName = element.getNodeName();
+		boolean hasNamespace = elementNodeName.contains(":");
+		
+		if (elementName == null) {
+			elementName = elementNodeName;
+			if (hasNamespace) {
+				elementName = elementName.substring(elementName.indexOf(":") + 1);
+			}
+		}
+		
+		try (BufferedReader reader = new BufferedReader(
+				new InputStreamReader(new FileInputStream(xmlFile), 
+						encoding != null ? encoding : "UTF-8"))) {
+			
+			String line;
+			int lineNumber = 0;
+			
+			// 속성 값 가져오기
+			String attrValue = null;
+			NamedNodeMap attrs = element.getAttributes();
+			for (int i = 0; i < attrs.getLength(); i++) {
+				Node attr = attrs.item(i);
+				String nodeName = attr.getNodeName();
+				String localName = attr.getLocalName();
+				if (nodeName.equals(attrName) || (localName != null && localName.equals(attrName))) {
+					attrValue = attr.getNodeValue();
+					break;
+				} else if (localName == null && nodeName.contains(":")) {
+					String localPart = nodeName.substring(nodeName.indexOf(":") + 1);
+					if (localPart.equals(attrName)) {
+						attrValue = attr.getNodeValue();
+						break;
+					}
+				}
+			}
+			
+			System.out.println("속성 라인 번호 찾기: 요소=" + elementName + ", 속성=" + attrName + ", 값=" + attrValue);
+			
+			// 속성 값이 있는 경우, 더 간단하고 확실한 방법 사용
+			if (attrValue != null && !attrValue.isEmpty()) {
+				// 속성 이름과 값을 포함하는 라인 찾기 (대소문자 구분 없이)
+				// 여러 패턴 시도: Code="aBA", Code='aBA', Code = "aBA" 등
+				String[] attrPatterns = {
+					attrName + "\\s*=\\s*[\"']" + Pattern.quote(attrValue) + "[\"']",
+					attrName + "\\s*=\\s*" + Pattern.quote(attrValue),
+					attrName + "=" + Pattern.quote(attrValue)
+				};
+				
+				// 요소 이름 검색 패턴
+				String[] elementPatterns = new String[3];
+				if (hasNamespace) {
+					String prefix = elementNodeName.substring(0, elementNodeName.indexOf(":"));
+					elementPatterns[0] = prefix + ":" + elementName;
+					elementPatterns[1] = "<" + prefix + ":" + elementName;
+					elementPatterns[2] = elementName;
+				} else {
+					elementPatterns[0] = elementName;
+					elementPatterns[1] = "<" + elementName;
+					elementPatterns[2] = elementName;
+				}
+				
+				while ((line = reader.readLine()) != null) {
+					lineNumber++;
+					
+					// 라인에 요소 이름이 포함되어 있는지 확인
+					boolean hasElement = false;
+					for (String elemPattern : elementPatterns) {
+						if (line.contains(elemPattern)) {
+							hasElement = true;
+							break;
+						}
+					}
+					
+					if (hasElement) {
+						// 속성 패턴 매칭 시도
+						for (String attrPatternStr : attrPatterns) {
+							try {
+								Pattern attrPattern = Pattern.compile(attrPatternStr, Pattern.CASE_INSENSITIVE);
+								Matcher matcher = attrPattern.matcher(line);
+								if (matcher.find()) {
+									System.out.println("속성 라인 번호 찾기 성공: 라인 " + lineNumber);
+									System.out.println("매칭된 라인: " + line.trim());
+									return lineNumber;
+								}
+							} catch (Exception e) {
+								// 패턴 컴파일 실패 시 다음 패턴 시도
+							}
+						}
+						
+						// 정규식 실패 시 단순 문자열 검색
+						if (line.contains(attrName + "=") && line.contains(attrValue)) {
+							System.out.println("속성 라인 번호 찾기 성공 (문자열 검색): 라인 " + lineNumber);
+							System.out.println("매칭된 라인: " + line.trim());
+							return lineNumber;
+						}
+					}
+				}
+			} else {
+				// 속성 값이 없으면 속성 이름만으로 찾기
+				String searchAttr = attrName + "\\s*=";
+				Pattern attrPattern = Pattern.compile(searchAttr, Pattern.CASE_INSENSITIVE);
+				
+				String elementSearch = elementName;
+				if (hasNamespace) {
+					String prefix = elementNodeName.substring(0, elementNodeName.indexOf(":"));
+					elementSearch = prefix + ":" + elementName;
+				}
+				
+				while ((line = reader.readLine()) != null) {
+					lineNumber++;
+					if (line.contains(elementSearch) || line.contains(elementName)) {
+						Matcher matcher = attrPattern.matcher(line);
+						if (matcher.find()) {
+							System.out.println("속성 라인 번호 찾기 성공: 라인 " + lineNumber);
+							System.out.println("매칭된 라인: " + line.trim());
+							return lineNumber;
+						}
+					}
+				}
+			}
+			
+			System.err.println("========================================");
+			System.err.println("속성 라인 번호를 찾지 못했습니다!");
+			System.err.println("  요소: " + elementName);
+			System.err.println("  속성: " + attrName);
+			System.err.println("  값: " + attrValue);
+			System.err.println("  파일: " + xmlFile.getName());
+			System.err.println("========================================");
+		} catch (Exception e) {
+			System.err.println("========================================");
+			System.err.println("속성 라인 번호 찾기 오류 발생!");
+			System.err.println("  요소: " + elementName);
+			System.err.println("  속성: " + attrName);
+			System.err.println("  오류: " + e.getMessage());
+			System.err.println("========================================");
+			e.printStackTrace();
+		}
+		
+		// 찾지 못한 경우 요소의 라인 번호 반환
+		System.out.println(">>> 요소 라인 번호 찾기 시도...");
+		int elementLineNum = findElementLineNumber(xmlFile, element, path, encoding);
+		System.out.println(">>> 요소 라인 번호: " + elementLineNum);
+		return elementLineNum;
+	}
+	
+	/**
 	 * 요소를 검증합니다.
 	 */
 	@SuppressWarnings("unchecked")
 	private void validateElement(File xmlFile, Element element, Map<String, Object> rule, String path) {
-		System.out.println("요소 검증 시작: " + path + " (요소 이름: " + element.getNodeName() + ")");
+		System.out.println("========================================");
+		System.out.println("요소 검증 시작: " + path);
+		System.out.println("요소 nodeName: " + element.getNodeName());
+		System.out.println("요소 localName: " + element.getLocalName());
+		System.out.println("요소 namespaceURI: " + element.getNamespaceURI());
 		
 		// 1. 속성 검증
+		@SuppressWarnings("unchecked")
 		Map<String, Object> attributes = (Map<String, Object>) rule.get("attributes");
+		System.out.println("========================================");
+		System.out.println(">>> 속성 검증 규칙 확인: " + path);
+		System.out.println(">>> attributes 규칙 존재 여부: " + (attributes != null));
 		if (attributes != null) {
-			System.out.println("속성 검증 규칙 발견: " + attributes.keySet());
+			System.out.println(">>> 속성 검증 규칙 발견: " + attributes.keySet());
+			System.out.println(">>> 속성 규칙 개수: " + attributes.size());
+			
+			// 요소의 모든 속성 출력 (디버깅)
+			NamedNodeMap allAttrs = element.getAttributes();
+			System.out.println("요소 '" + path + "'의 모든 속성 (총 " + allAttrs.getLength() + "개):");
+			for (int i = 0; i < allAttrs.getLength(); i++) {
+				Node attr = allAttrs.item(i);
+				System.out.println("  속성[" + i + "]: nodeName='" + attr.getNodeName() + 
+						"', localName='" + attr.getLocalName() + 
+						"', namespaceURI='" + attr.getNamespaceURI() +
+						"', value='" + attr.getNodeValue() + "'");
+			}
+			
+			// STR 요소의 Code 속성 특별 체크 및 강제 검증
+			if ("STR".equals(path)) {
+				System.out.println(">>> STR 요소 검증 중 - Code 속성 특별 체크");
+				boolean hasCodeAttr = false;
+				String codeValue = null;
+				for (int i = 0; i < allAttrs.getLength(); i++) {
+					Node attr = allAttrs.item(i);
+					String attrName = attr.getLocalName();
+					if (attrName == null) {
+						attrName = attr.getNodeName();
+						if (attrName.contains(":")) {
+							attrName = attrName.substring(attrName.indexOf(":") + 1);
+						}
+					}
+					if ("Code".equals(attrName)) {
+						hasCodeAttr = true;
+						codeValue = attr.getNodeValue();
+						System.out.println(">>> STR Code 속성 발견! 값: '" + codeValue + "'");
+						System.out.println(">>> Code 속성 규칙 존재 여부: " + attributes.containsKey("Code"));
+						
+						// STR Code 속성 강제 검증: BA 또는 CA만 허용
+						if (codeValue != null && !codeValue.isEmpty()) {
+							codeValue = codeValue.trim();
+							if (!"BA".equals(codeValue) && !"CA".equals(codeValue)) {
+								int lineNum = findElementLineNumber(xmlFile, element, path, 
+										ruleParser != null ? ruleParser.getEncoding() : "UTF-8");
+								String errorMessage = "STR 요소의 Code 속성 값 '" + codeValue + 
+										"'이(가) 허용된 값이 아닙니다. 허용값: [BA, CA]";
+								System.err.println(">>> STR Code 속성 강제 검증 오류: " + errorMessage);
+								addError(xmlFile, lineNum, -1, errorMessage);
+							} else {
+								System.out.println(">>> STR Code 속성 강제 검증 통과: '" + codeValue + "'");
+							}
+						} else {
+							int lineNum = findElementLineNumber(xmlFile, element, path, 
+									ruleParser != null ? ruleParser.getEncoding() : "UTF-8");
+							String errorMessage = "STR 요소의 Code 속성은 필수입니다.";
+							System.err.println(">>> STR Code 속성 강제 검증 오류: " + errorMessage);
+							addError(xmlFile, lineNum, -1, errorMessage);
+						}
+						break;
+					}
+				}
+				if (!hasCodeAttr) {
+					// Code 속성이 없으면 enum 검증에서 처리하므로 여기서는 로그만 출력
+					System.err.println(">>> 경고: STR 요소에 Code 속성이 없습니다.");
+				}
+			}
+			
 			validateAttributes(xmlFile, element, attributes, path);
 		} else {
 			System.out.println("속성 검증 규칙 없음");
@@ -477,7 +719,10 @@ public class ConsistencyValidator {
 		} catch (Exception e) {
 			System.err.println("인코딩 가져오기 오류: " + e.getMessage());
 		}
-		int lineNum = findElementLineNumber(xmlFile, element, path, encoding);
+		if (encoding == null || encoding.isEmpty()) {
+			encoding = "UTF-8";
+		}
+		int baseLineNum = findElementLineNumber(xmlFile, element, path, encoding);
 		
 		// 디버깅: 요소의 모든 속성 출력
 		NamedNodeMap allAttrs = element.getAttributes();
@@ -511,8 +756,31 @@ public class ConsistencyValidator {
 			String attrName = entry.getKey();
 			Object attrRule = entry.getValue();
 			
+			// 각 속성의 라인 번호 계산 (속성별로 정확한 라인 찾기)
 			System.out.println("========================================");
-			System.out.println("속성 검증 시작: " + path + "/@" + attrName);
+			System.out.println(">>> 라인 번호 찾기 시작: " + path + "/@" + attrName);
+			System.out.println(">>> baseLineNum: " + baseLineNum);
+			System.out.println(">>> 파일: " + xmlFile.getName());
+			
+			int lineNum = findAttributeLineNumber(xmlFile, element, path, attrName, encoding);
+			System.out.println(">>> findAttributeLineNumber 반환값: " + lineNum);
+			
+			if (lineNum < 0) {
+				System.out.println(">>> 속성 라인을 찾지 못함. baseLineNum 사용: " + baseLineNum);
+				lineNum = baseLineNum; // 속성 라인을 찾지 못하면 요소 라인 사용
+			}
+			if (lineNum < 0) {
+				// 요소 라인도 찾지 못한 경우, 최소한 1로 설정 (루트 요소)
+				System.out.println(">>> 요소 라인도 찾지 못함. 기본값 1 사용");
+				lineNum = 1;
+				System.err.println("경고: 라인 번호를 찾을 수 없어 기본값 1을 사용합니다: " + path + "/@" + attrName);
+			}
+			
+			System.out.println(">>> 최종 라인 번호: " + lineNum);
+			System.out.println("========================================");
+			
+			System.out.println("========================================");
+			System.out.println("속성 검증 시작: " + path + "/@" + attrName + " (라인: " + lineNum + ")");
 			System.out.println("속성 규칙 타입: " + (attrRule instanceof Map ? "Map" : attrRule.getClass().getSimpleName()));
 			if (attrRule instanceof Map) {
 				Map<String, Object> attrRuleMap = (Map<String, Object>) attrRule;
@@ -528,10 +796,15 @@ public class ConsistencyValidator {
 			
 			// 방법 1: NamedNodeMap을 통해 직접 읽기 (가장 안정적)
 			NamedNodeMap attrs = element.getAttributes();
+			System.out.println("요소의 모든 속성 개수: " + attrs.getLength());
 			for (int i = 0; i < attrs.getLength(); i++) {
 				Node attr = attrs.item(i);
 				String attrNodeName = attr.getNodeName();
 				String attrLocalName = attr.getLocalName();
+				
+				System.out.println("  속성[" + i + "]: nodeName='" + attrNodeName + 
+						"', localName='" + attrLocalName + 
+						"', 찾는 속성명='" + attrName + "'");
 				
 				// nodeName 또는 localName이 일치하는지 확인
 				if (attrNodeName.equals(attrName)) {
@@ -637,15 +910,24 @@ public class ConsistencyValidator {
 				
 				// enum 타입 검증
 				String type = (String) attrRuleMap.get("type");
+				System.out.println("속성 규칙 type 확인: '" + type + "' (비교 대상: 'enum')");
 				if ("enum".equals(type)) {
 					System.out.println("========================================");
-					System.out.println("enum 검증 시작: " + path + "/@" + attrName);
+					System.out.println(">>> enum 검증 시작: " + path + "/@" + attrName);
 					System.out.println("속성 값: '" + attrValue + "'");
 					System.out.println("속성 값 길이: " + attrValue.length());
 					
 					@SuppressWarnings("unchecked")
 					List<String> allowedValues = (List<String>) attrRuleMap.get("allowed_values");
 					System.out.println("허용된 값 목록: " + allowedValues);
+					System.out.println("허용된 값 목록 타입: " + (allowedValues != null ? allowedValues.getClass().getName() : "null"));
+					if (allowedValues != null) {
+						System.out.println("허용된 값 목록 크기: " + allowedValues.size());
+						for (int i = 0; i < allowedValues.size(); i++) {
+							String allowedValue = allowedValues.get(i);
+							System.out.println("  허용값[" + i + "]: '" + allowedValue + "' (길이: " + allowedValue.length() + ")");
+						}
+					}
 					
 					if (allowedValues != null && !allowedValues.isEmpty()) {
 						// 필수 속성인 경우 빈 값도 체크
@@ -669,13 +951,42 @@ public class ConsistencyValidator {
 							}
 						} else {
 							// 허용된 값 목록에 포함되어 있는지 확인
-							boolean isAllowed = allowedValues.contains(attrValue);
+							// 대소문자 구분 없이 비교 (필요한 경우)
+							boolean isAllowed = false;
+							for (String allowedValue : allowedValues) {
+								if (allowedValue.equals(attrValue)) {
+									isAllowed = true;
+									break;
+								}
+							}
+							
 							System.out.println("값 '" + attrValue + "'이(가) 허용 목록에 있는가? " + isAllowed);
+							System.out.println("비교 상세:");
+							for (String allowedValue : allowedValues) {
+								boolean matches = allowedValue.equals(attrValue);
+								System.out.println("  '" + attrValue + "' == '" + allowedValue + "' ? " + matches);
+								if (matches) {
+									System.out.println("    (문자 길이 비교: " + attrValue.length() + " vs " + allowedValue.length() + ")");
+								}
+							}
 							
 							if (!isAllowed) {
 								String errorMessage = path + " 요소의 " + attrName + " 속성 값 '" + attrValue + 
 										"'이(가) 허용된 값이 아닙니다. 허용값: " + allowedValues;
 								System.err.println("enum 검증 오류: " + errorMessage);
+								System.err.println(">>> 라인 번호: " + lineNum + " (baseLineNum: " + baseLineNum + ")");
+								if (lineNum <= 0) {
+									System.err.println(">>> 경고: 라인 번호가 유효하지 않습니다. 다시 찾기를 시도합니다.");
+									// 라인 번호를 다시 찾기
+									int retryLineNum = findAttributeLineNumber(xmlFile, element, path, attrName, encoding);
+									if (retryLineNum > 0) {
+										lineNum = retryLineNum;
+										System.err.println(">>> 재시도 성공: 라인 번호 " + lineNum);
+									} else {
+										lineNum = baseLineNum > 0 ? baseLineNum : 1;
+										System.err.println(">>> 재시도 실패: 기본 라인 번호 " + lineNum + " 사용");
+									}
+								}
 								addError(xmlFile, lineNum, -1, errorMessage);
 							} else {
 								System.out.println("enum 검증 통과: " + attrName + " = '" + attrValue + "'");
@@ -685,9 +996,32 @@ public class ConsistencyValidator {
 						System.err.println("경고: enum 타입인데 allowed_values가 비어있거나 null입니다.");
 					}
 					System.out.println("========================================");
+					// enum 검증이 있으면 format 검증은 건너뜀 (중복 방지)
+				} else {
+					// enum 타입이 아닌 경우에만 format 검증 수행
+					String format = (String) attrRuleMap.get("format");
+					if (format != null && !format.isEmpty() && !attrValue.isEmpty()) {
+						System.out.println("format 검증 시작: " + path + "/@" + attrName + " = '" + attrValue + "'");
+						System.out.println("format 패턴: '" + format + "'");
+						try {
+							java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(format);
+							java.util.regex.Matcher matcher = pattern.matcher(attrValue);
+							if (!matcher.matches()) {
+								String errorMessage = path + " 요소의 " + attrName + " 속성 값 '" + attrValue + 
+										"'이(가) 허용된 형식이 아닙니다. 형식: " + format;
+								System.err.println("format 검증 오류: " + errorMessage);
+								addError(xmlFile, lineNum, -1, errorMessage);
+							} else {
+								System.out.println("format 검증 통과: " + attrName + " = '" + attrValue + "'");
+							}
+						} catch (Exception e) {
+							System.err.println("format 패턴 컴파일 오류: " + e.getMessage());
+						}
+					}
 				}
+				
 				// fixed_length 타입 검증 (정확한 길이 검증)
-				else if ("fixed_length".equals(type)) {
+				if ("fixed_length".equals(type)) {
 					Object lengthObj = attrRuleMap.get("length");
 					if (lengthObj != null) {
 						int requiredLength = Integer.parseInt(lengthObj.toString());
@@ -729,8 +1063,9 @@ public class ConsistencyValidator {
 						}
 					}
 				}
+				
 				// max_length 타입 검증 (최대 길이 검증)
-				else if ("max_length".equals(type)) {
+				if ("max_length".equals(type)) {
 					Object lengthObj = attrRuleMap.get("length");
 					if (lengthObj != null) {
 						int maxLength = Integer.parseInt(lengthObj.toString());

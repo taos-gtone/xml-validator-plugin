@@ -72,7 +72,12 @@ public class XmlValidationView extends ViewPart {
 	private Combo xmlPathCombo;
 	private Text rulePathText;
 	private Button validateButton;
+	private Button cancelButton;
 	private Label statusLabel;
+	private org.eclipse.swt.widgets.ProgressBar progressBar;
+	
+	// 검증 중단 플래그
+	private volatile boolean validationCancelled = false;
 	
 	// 선택된 파일들 저장
 	private List<File> selectedXmlFiles = new ArrayList<>();
@@ -182,10 +187,19 @@ public class XmlValidationView extends ViewPart {
 			}
 		});
 		
+		// 검증 실행 및 중단 버튼을 담을 Composite
+		Composite buttonPanel = new Composite(controlPanel, SWT.NONE);
+		buttonPanel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 4, 1));
+		GridLayout buttonLayout = new GridLayout(2, false);
+		buttonLayout.marginWidth = 0;
+		buttonLayout.marginHeight = 0;
+		buttonLayout.horizontalSpacing = 5;
+		buttonPanel.setLayout(buttonLayout);
+		
 		// 검증 실행 버튼
-		validateButton = new Button(controlPanel, SWT.PUSH);
+		validateButton = new Button(buttonPanel, SWT.PUSH);
 		validateButton.setText("검증 실행");
-		validateButton.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 4, 1));
+		validateButton.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
 		validateButton.addSelectionListener(new SelectionAdapter() {
 			@Override
 			public void widgetSelected(SelectionEvent e) {
@@ -193,10 +207,35 @@ public class XmlValidationView extends ViewPart {
 			}
 		});
 		
+		// 검증 중단 버튼
+		cancelButton = new Button(buttonPanel, SWT.PUSH);
+		cancelButton.setText("검증 중단");
+		cancelButton.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+		cancelButton.setEnabled(false); // 초기에는 비활성화
+		cancelButton.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				cancelValidation();
+			}
+		});
+		
+		// 상태 레이블과 Progress Bar를 담을 Composite
+		Composite statusPanel = new Composite(parent, SWT.NONE);
+		statusPanel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+		GridLayout statusLayout = new GridLayout(1, false);
+		statusLayout.marginWidth = 0;
+		statusLayout.marginHeight = 0;
+		statusPanel.setLayout(statusLayout);
+		
 		// 상태 레이블
-		statusLabel = new Label(parent, SWT.NONE);
+		statusLabel = new Label(statusPanel, SWT.NONE);
 		statusLabel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
 		statusLabel.setText("XML 파일 또는 폴더를 선택하고 검증을 실행하세요.");
+		
+		// Progress Bar
+		progressBar = new org.eclipse.swt.widgets.ProgressBar(statusPanel, SWT.HORIZONTAL | SWT.SMOOTH);
+		progressBar.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+		progressBar.setVisible(false); // 초기에는 숨김
 		
 		// 기본 규칙 파일 설정 및 로드 (statusLabel 생성 후에 호출)
 		try {
@@ -964,6 +1003,31 @@ public class XmlValidationView extends ViewPart {
 	}
 	
 	/**
+	 * 검증 중단
+	 */
+	private void cancelValidation() {
+		System.out.println("========================================");
+		System.out.println("검증 중단 요청 수신!");
+		System.out.println("========================================");
+		validationCancelled = true;
+		Display display = getSite().getShell().getDisplay();
+		display.asyncExec(() -> {
+			if (!cancelButton.isDisposed()) {
+				cancelButton.setEnabled(false);
+			}
+			if (!validateButton.isDisposed()) {
+				validateButton.setEnabled(true);
+			}
+			if (!statusLabel.isDisposed()) {
+				statusLabel.setText("검증 중단 중...");
+			}
+			if (!progressBar.isDisposed()) {
+				progressBar.setVisible(false);
+			}
+		});
+	}
+	
+	/**
 	 * 검증 수행
 	 */
 	private void performValidation() {
@@ -994,26 +1058,58 @@ public class XmlValidationView extends ViewPart {
 			return;
 		}
 		
-		// 디버깅: 로드된 규칙 정보 출력
-		System.out.println("======================================");
-		System.out.println("검증 시작");
-		System.out.println("XML 파일 수: " + selectedXmlFiles.size());
-		System.out.println("규칙 파서 상태: " + (ruleParser != null ? "로드됨" : "없음"));
-		if (ruleParser != null) {
-			System.out.println("파싱된 규칙: " + ruleParser.getRules());
-			System.out.println("파싱된 규칙 키: " + ruleParser.getRules().keySet());
+		// 검증 중단 플래그 초기화 및 버튼 상태 변경 (동기적으로 즉시 실행)
+		validationCancelled = false;
+		if (!validateButton.isDisposed()) {
+			validateButton.setEnabled(false);
 		}
-		System.out.println("======================================");
+		if (!cancelButton.isDisposed()) {
+			cancelButton.setEnabled(true);
+		}
 		
-		// 검증 수행
-		List<ValidationError> allErrors = new ArrayList<>();
-		XmlSyntaxValidator syntaxValidator = new XmlSyntaxValidator();
-		int validCount = 0;
-		int invalidCount = 0;
+		// 검증을 별도 스레드에서 실행하여 UI가 블로킹되지 않도록 함
+		// Display 객체를 미리 가져와서 스레드에서 사용
+		final Display display = getSite().getShell().getDisplay();
 		
-		statusLabel.setText("검증 중... (0/" + selectedXmlFiles.size() + ")");
-		
-		for (int i = 0; i < selectedXmlFiles.size(); i++) {
+		Thread validationThread = new Thread(new Runnable() {
+			@Override
+			public void run() {
+				// 디버깅: 로드된 규칙 정보 출력
+				System.out.println("======================================");
+				System.out.println("검증 시작");
+				System.out.println("XML 파일 수: " + selectedXmlFiles.size());
+				System.out.println("규칙 파서 상태: " + (ruleParser != null ? "로드됨" : "없음"));
+				if (ruleParser != null) {
+					System.out.println("파싱된 규칙: " + ruleParser.getRules());
+					System.out.println("파싱된 규칙 키: " + ruleParser.getRules().keySet());
+				}
+				System.out.println("======================================");
+				
+				// 검증 수행
+				List<ValidationError> allErrors = new ArrayList<>();
+				XmlSyntaxValidator syntaxValidator = new XmlSyntaxValidator();
+				int validCount = 0;
+				int invalidCount = 0;
+				
+				// Progress Bar 초기화 및 표시
+				display.asyncExec(() -> {
+			if (!progressBar.isDisposed()) {
+				progressBar.setMaximum(selectedXmlFiles.size());
+				progressBar.setSelection(0);
+				progressBar.setVisible(true);
+			}
+			if (!statusLabel.isDisposed()) {
+				statusLabel.setText("검증 중... (0/" + selectedXmlFiles.size() + ")");
+			}
+				});
+				
+				for (int i = 0; i < selectedXmlFiles.size(); i++) {
+			// 검증 중단 확인
+			if (validationCancelled) {
+				System.out.println("검증이 중단되었습니다. (" + i + "/" + selectedXmlFiles.size() + " 파일 처리됨)");
+				break;
+			}
+			
 			File originalFile = selectedXmlFiles.get(i);
 			String filePath = originalFile.getAbsolutePath();
 			
@@ -1051,12 +1147,36 @@ public class XmlValidationView extends ViewPart {
 			System.out.println("파일 검증 시작: " + xmlFile.getAbsolutePath() + 
 					" (크기: " + xmlFile.length() + " bytes, 수정 시간: " + currentModified + ")");
 			
+			// 검증 중단 확인 (파일 처리 시작 전)
+			if (validationCancelled) {
+				System.out.println("검증이 중단되었습니다. (" + i + "/" + selectedXmlFiles.size() + " 파일 처리됨)");
+				break;
+			}
+			
 			boolean hasError = false;
 			
 			// 1. 문법 체크
 			boolean syntaxValid = syntaxValidator.validate(xmlFile);
+			
+			// 검증 중단 확인 (문법 체크 후)
+			if (validationCancelled) {
+				System.out.println("검증이 중단되었습니다. (" + i + "/" + selectedXmlFiles.size() + " 파일 처리됨)");
+				break;
+			}
+			
 			if (!syntaxValid) {
+				// 검증 중단 확인 (오류 처리 전)
+				if (validationCancelled) {
+					System.out.println("검증이 중단되었습니다. (" + i + "/" + selectedXmlFiles.size() + " 파일 처리됨)");
+					break;
+				}
+				
 				for (ValidationError error : syntaxValidator.getErrors()) {
+					// 검증 중단 확인 (각 오류 처리 전)
+					if (validationCancelled) {
+						System.out.println("검증이 중단되었습니다. (" + i + "/" + selectedXmlFiles.size() + " 파일 처리됨)");
+						break;
+					}
 					allErrors.add(new ValidationError(
 							error.getFile(), 
 							error.getLineNumber(), 
@@ -1067,12 +1187,42 @@ public class XmlValidationView extends ViewPart {
 				hasError = true;
 			}
 			
+			// 검증 중단 확인 (문법 체크 오류 처리 후)
+			if (validationCancelled) {
+				System.out.println("검증이 중단되었습니다. (" + i + "/" + selectedXmlFiles.size() + " 파일 처리됨)");
+				break;
+			}
+			
 			// 2. 정합성 체크 (규칙 파일이 있고 문법 오류가 없는 경우)
 			if (ruleParser != null && syntaxValid) {
+				// 검증 중단 확인 (정합성 체크 전)
+				if (validationCancelled) {
+					System.out.println("검증이 중단되었습니다. (" + i + "/" + selectedXmlFiles.size() + " 파일 처리됨)");
+					break;
+				}
+				
 				ConsistencyValidator consistencyValidator = new ConsistencyValidator(ruleParser);
 				boolean consistencyValid = consistencyValidator.validate(xmlFile);
+				
+				// 검증 중단 확인 (정합성 체크 후)
+				if (validationCancelled) {
+					System.out.println("검증이 중단되었습니다. (" + i + "/" + selectedXmlFiles.size() + " 파일 처리됨)");
+					break;
+				}
+				
 				if (!consistencyValid) {
+					// 검증 중단 확인 (정합성 오류 처리 전)
+					if (validationCancelled) {
+						System.out.println("검증이 중단되었습니다. (" + i + "/" + selectedXmlFiles.size() + " 파일 처리됨)");
+						break;
+					}
+					
 					for (ValidationError error : consistencyValidator.getErrors()) {
+						// 검증 중단 확인 (각 오류 처리 전)
+						if (validationCancelled) {
+							System.out.println("검증이 중단되었습니다. (" + i + "/" + selectedXmlFiles.size() + " 파일 처리됨)");
+							break;
+						}
 						allErrors.add(new ValidationError(
 								error.getFile(), 
 								error.getLineNumber(), 
@@ -1084,41 +1234,88 @@ public class XmlValidationView extends ViewPart {
 				}
 			}
 			
+			// 검증 중단 확인 (파일 처리 완료 후)
+			if (validationCancelled) {
+				System.out.println("검증이 중단되었습니다. (" + (i + 1) + "/" + selectedXmlFiles.size() + " 파일 처리됨)");
+				break;
+			}
+			
 			if (hasError) {
 				invalidCount++;
 			} else {
 				validCount++;
 			}
 			
-			// 진행 상태 업데이트
-			final int progress = i + 1;
-			Display.getCurrent().asyncExec(() -> {
-				if (!statusLabel.isDisposed()) {
-					statusLabel.setText("검증 중... (" + progress + "/" + selectedXmlFiles.size() + ")");
+				// 진행 상태 업데이트
+				final int progress = i + 1;
+				display.asyncExec(() -> {
+					if (!progressBar.isDisposed()) {
+						progressBar.setSelection(progress);
+					}
+					if (!statusLabel.isDisposed()) {
+						statusLabel.setText("검증 중... (" + progress + "/" + selectedXmlFiles.size() + ")");
+					}
+				});
+			}
+			
+			// 검증 완료/중단 후 UI 상태 복원
+			// 람다에서 사용하기 위해 final 변수로 복사
+			final int finalValidCount = validCount;
+			final int finalInvalidCount = invalidCount;
+			final int finalTotalFiles = selectedXmlFiles.size();
+			final int finalErrorCount = allErrors.size();
+			final int finalTotalErrors = allValidationErrors.size();
+			final boolean finalCancelled = validationCancelled;
+			
+			display.asyncExec(() -> {
+				if (!progressBar.isDisposed()) {
+					progressBar.setVisible(false);
+				}
+				if (!validateButton.isDisposed()) {
+					validateButton.setEnabled(true);
+				}
+				if (!cancelButton.isDisposed()) {
+					cancelButton.setEnabled(false);
 				}
 			});
-		}
+			
+			// 새로운 오류를 기존 오류 리스트의 앞에 추가 (최신 오류가 상단에 표시)
+			allValidationErrors.addAll(0, allErrors);
+			
+			// 결과 표시 (모든 오류 포함) - UI 스레드에서 실행
+			display.asyncExec(() -> {
+				tableViewer.setInput(allValidationErrors);
+				
+				// 상태 메시지 업데이트
+				String statusMessage;
+				if (finalCancelled) {
+					statusMessage = String.format("검증 중단: %d개 파일 처리됨 (성공: %d, 실패: %d, 오류: %d건) | 전체 누적 오류: %d건",
+							finalValidCount + finalInvalidCount, finalValidCount, finalInvalidCount, finalErrorCount, finalTotalErrors);
+				} else {
+					statusMessage = String.format("검증 완료: 총 %d개 파일 (성공: %d, 실패: %d, 오류: %d건) | 전체 누적 오류: %d건",
+							finalTotalFiles, finalValidCount, finalInvalidCount, finalErrorCount, finalTotalErrors);
+				}
+				if (!statusLabel.isDisposed()) {
+					statusLabel.setText(statusMessage);
+				}
+			});
+			
+			// 결과 메시지 (UI 스레드에서 실행)
+			display.asyncExec(() -> {
+				if (finalErrorCount == 0) {
+					MessageDialog.openInformation(getSite().getShell(), "검증 완료", 
+							"모든 " + finalTotalFiles + "개 XML 파일이 검증을 통과했습니다.");
+				} else {
+					MessageDialog.openWarning(getSite().getShell(), "검증 완료", 
+							finalTotalFiles + "개 파일 중 " + finalInvalidCount + "개 파일에서 " + 
+							finalErrorCount + "건의 오류가 발견되었습니다.");
+				}
+			});
+			}
+		});
 		
-		// 새로운 오류를 기존 오류 리스트의 앞에 추가 (최신 오류가 상단에 표시)
-		allValidationErrors.addAll(0, allErrors);
-		
-		// 결과 표시 (모든 오류 포함)
-		tableViewer.setInput(allValidationErrors);
-		
-		// 상태 메시지 업데이트
-		String statusMessage = String.format("검증 완료: 총 %d개 파일 (성공: %d, 실패: %d, 오류: %d건) | 전체 누적 오류: %d건",
-				selectedXmlFiles.size(), validCount, invalidCount, allErrors.size(), allValidationErrors.size());
-		statusLabel.setText(statusMessage);
-		
-		// 결과 메시지
-		if (allErrors.isEmpty()) {
-			MessageDialog.openInformation(getSite().getShell(), "검증 완료", 
-					"모든 " + selectedXmlFiles.size() + "개 XML 파일이 검증을 통과했습니다.");
-		} else {
-			MessageDialog.openWarning(getSite().getShell(), "검증 완료", 
-					selectedXmlFiles.size() + "개 파일 중 " + invalidCount + "개 파일에서 " + 
-					allErrors.size() + "건의 오류가 발견되었습니다.");
-		}
+		// 검증 스레드 시작
+		validationThread.start();
 	}
 	
 	/**

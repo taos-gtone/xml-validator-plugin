@@ -16,6 +16,7 @@ rules:
         - BA
         - CA
         required: true
+        format: '^(BA|CA)$'
         description: '일반금융기관 : "BA", 카지노 : "CA" (BA 또는 CA 중 하나만 허용)'
     children:
       Organization:
