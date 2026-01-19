@@ -2,7 +2,9 @@ package com.xmlvalidator.views;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.viewers.ArrayContentProvider;
@@ -15,10 +17,13 @@ import org.eclipse.jface.viewers.TableViewerColumn;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.TraverseEvent;
+import org.eclipse.swt.events.TraverseListener;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Display;
@@ -41,7 +46,11 @@ import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.ui.texteditor.ITextEditor;
 import org.eclipse.jface.text.IDocument;
+import org.eclipse.jface.text.BadLocationException;
+import org.eclipse.jface.text.IRegion;
 import org.eclipse.ui.IEditorPart;
+import org.eclipse.ui.IPartListener;
+import org.eclipse.ui.IWorkbenchPart;
 import org.osgi.framework.Bundle;
 
 import com.xmlvalidator.model.ValidationError;
@@ -60,7 +69,7 @@ public class XmlValidationView extends ViewPart {
 	private static final String DEFAULT_RULE_FILE = "rules/xml_validation_rules_with_codes.yaml";
 	
 	private TableViewer tableViewer;
-	private Text xmlPathText;
+	private Combo xmlPathCombo;
 	private Text rulePathText;
 	private Button validateButton;
 	private Label statusLabel;
@@ -68,34 +77,71 @@ public class XmlValidationView extends ViewPart {
 	// 선택된 파일들 저장
 	private List<File> selectedXmlFiles = new ArrayList<>();
 	
+	// XML 경로 히스토리 (최근 선택한 경로들)
+	private List<String> xmlPathHistory = new ArrayList<>();
+	private static final int MAX_HISTORY_SIZE = 20;
+	
+	// 모든 오류 메시지 저장 (누적)
+	private List<ValidationError> allValidationErrors = new ArrayList<>();
+	
 	// 규칙 파서 (한 번만 로드)
 	private YamlRuleParser ruleParser = null;
 	private File currentRuleFile = null;
 	
+	// 파일별 마지막 수정 시간 추적 (파일 경로 -> 마지막 수정 시간)
+	private Map<String, Long> fileLastModifiedMap = new HashMap<>();
+	
 	@Override
 	public void createPartControl(Composite parent) {
-		// 레이아웃 설정
-		GridLayout layout = new GridLayout(1, false);
-		layout.marginWidth = 10;
-		layout.marginHeight = 10;
-		parent.setLayout(layout);
-		
-		// 상단 컨트롤 패널
-		Composite controlPanel = new Composite(parent, SWT.NONE);
-		controlPanel.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
-		GridLayout controlLayout = new GridLayout(4, false);
-		controlLayout.marginWidth = 0;
-		controlLayout.marginHeight = 0;
-		controlPanel.setLayout(controlLayout);
+		try {
+			// 레이아웃 설정
+			GridLayout layout = new GridLayout(1, false);
+			layout.marginWidth = 10;
+			layout.marginHeight = 10;
+			parent.setLayout(layout);
+			
+			// 상단 컨트롤 패널
+			Composite controlPanel = new Composite(parent, SWT.NONE);
+			controlPanel.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
+			GridLayout controlLayout = new GridLayout(4, false);
+			controlLayout.marginWidth = 0;
+			controlLayout.marginHeight = 0;
+			controlPanel.setLayout(controlLayout);
 		
 		// XML 파일/폴더 선택
 		Label xmlLabel = new Label(controlPanel, SWT.NONE);
 		xmlLabel.setText("XML 파일/폴더:");
 		xmlLabel.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false));
 		
-		xmlPathText = new Text(controlPanel, SWT.BORDER);
-		xmlPathText.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-		xmlPathText.setMessage("파일 또는 폴더 경로를 입력하거나 선택하세요");
+		xmlPathCombo = new Combo(controlPanel, SWT.BORDER | SWT.DROP_DOWN);
+		xmlPathCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+		xmlPathCombo.setToolTipText("파일 또는 폴더 경로를 입력하거나 이전에 선택한 경로를 선택하세요");
+		xmlPathCombo.setVisibleItemCount(10);
+		
+		// Combo에서 항목 선택 시 파일 목록 업데이트
+		xmlPathCombo.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				String selectedPath = xmlPathCombo.getText();
+				if (selectedPath != null && !selectedPath.trim().isEmpty()) {
+					updateSelectedFiles(selectedPath);
+				}
+			}
+		});
+		
+		// Enter 키 입력 시에도 파일 목록 업데이트
+		xmlPathCombo.addTraverseListener(new TraverseListener() {
+			@Override
+			public void keyTraversed(TraverseEvent e) {
+				if (e.detail == SWT.TRAVERSE_RETURN) {
+					String path = xmlPathCombo.getText();
+					if (path != null && !path.trim().isEmpty()) {
+						updateSelectedFiles(path);
+						e.doit = false; // 기본 동작 방지
+					}
+				}
+			}
+		});
 		
 		// 파일 선택 버튼
 		Button selectFileButton = new Button(controlPanel, SWT.PUSH);
@@ -153,7 +199,37 @@ public class XmlValidationView extends ViewPart {
 		statusLabel.setText("XML 파일 또는 폴더를 선택하고 검증을 실행하세요.");
 		
 		// 기본 규칙 파일 설정 및 로드 (statusLabel 생성 후에 호출)
-		loadDefaultRuleFile();
+		try {
+			loadDefaultRuleFile();
+		} catch (Exception e) {
+			System.err.println("기본 규칙 파일 로드 중 오류: " + e.getMessage());
+			e.printStackTrace();
+			statusLabel.setText("규칙 파일 로드 중 오류가 발생했습니다. '변경...' 버튼을 클릭하여 수동으로 선택하세요.");
+		}
+		
+		// 오류 메시지 영역 헤더
+		Composite errorHeaderPanel = new Composite(parent, SWT.BORDER);
+		GridLayout errorHeaderLayout = new GridLayout(2, false);
+		errorHeaderLayout.marginWidth = 5;
+		errorHeaderLayout.marginHeight = 5;
+		errorHeaderLayout.horizontalSpacing = 10;
+		errorHeaderPanel.setLayout(errorHeaderLayout);
+		errorHeaderPanel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+		
+		Label errorLabel = new Label(errorHeaderPanel, SWT.NONE);
+		errorLabel.setText("오류 메시지:");
+		errorLabel.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, true, false));
+		
+		Button clearButton = new Button(errorHeaderPanel, SWT.PUSH);
+		clearButton.setText("Clear");
+		clearButton.setToolTipText("모든 오류 메시지를 삭제합니다");
+		clearButton.setLayoutData(new GridData(SWT.RIGHT, SWT.CENTER, false, false));
+		clearButton.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				clearAllErrors();
+			}
+		});
 		
 		// 결과 테이블
 		tableViewer = new TableViewer(parent, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION | SWT.BORDER);
@@ -170,48 +246,279 @@ public class XmlValidationView extends ViewPart {
 		tableViewer.addDoubleClickListener(new IDoubleClickListener() {
 			@Override
 			public void doubleClick(DoubleClickEvent event) {
+				System.out.println("더블클릭 이벤트 발생");
 				IStructuredSelection selection = (IStructuredSelection) event.getSelection();
 				Object selected = selection.getFirstElement();
+				System.out.println("선택된 객체: " + (selected != null ? selected.getClass().getName() : "null"));
+				
 				if (selected instanceof ValidationError) {
 					ValidationError error = (ValidationError) selected;
+					System.out.println("ValidationError 발견:");
+					System.out.println("  파일: " + error.getFile().getAbsolutePath());
+					System.out.println("  라인 번호: " + error.getLineNumber());
+					System.out.println("  컬럼 번호: " + error.getColumnNumber());
+					System.out.println("  메시지: " + error.getMessage());
+					
 					openFileInEditor(error.getFile(), error.getLineNumber());
+				} else {
+					System.out.println("경고: 선택된 객체가 ValidationError가 아닙니다.");
 				}
 			}
 		});
+		} catch (Throwable e) {
+			// 초기화 중 오류 발생 시 에러 메시지 표시
+			System.err.println("========================================");
+			System.err.println("XmlValidationView 초기화 오류 발생!");
+			System.err.println("오류 타입: " + e.getClass().getName());
+			System.err.println("오류 메시지: " + e.getMessage());
+			System.err.println("========================================");
+			e.printStackTrace();
+			
+			// 최소한의 UI 표시
+			try {
+				if (statusLabel != null && !statusLabel.isDisposed()) {
+					statusLabel.setText("뷰 초기화 중 오류가 발생했습니다: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+				} else {
+					Label errorLabel = new Label(parent, SWT.WRAP);
+					errorLabel.setText("뷰 초기화 중 오류가 발생했습니다:\n" + 
+							e.getClass().getSimpleName() + "\n" + 
+							(e.getMessage() != null ? e.getMessage() : "알 수 없는 오류"));
+					errorLabel.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+				}
+			} catch (Throwable e2) {
+				// UI 생성도 실패한 경우
+				System.err.println("UI 생성도 실패했습니다: " + e2.getMessage());
+				e2.printStackTrace();
+			}
+			
+			// PartInitException은 checked exception이므로 RuntimeException으로 래핑하여 던짐
+			// ViewPart.createPartControl은 throws를 선언하지 않으므로 RuntimeException만 던질 수 있음
+			if (e instanceof PartInitException) {
+				// PartInitException을 RuntimeException으로 래핑
+				throw new RuntimeException("뷰 초기화 실패: " + e.getMessage(), e);
+			} else if (e instanceof RuntimeException) {
+				throw (RuntimeException) e;
+			} else {
+				// 다른 예외는 RuntimeException으로 래핑
+				throw new RuntimeException("뷰 초기화 중 오류 발생: " + e.getMessage(), e);
+			}
+		}
 	}
 	
 	/**
 	 * 파일을 편집기에서 열고 특정 라인으로 이동합니다.
 	 */
 	private void openFileInEditor(File file, int lineNumber) {
+		System.out.println("파일 열기 시도: " + file.getAbsolutePath() + ", 라인: " + lineNumber);
+		
 		try {
 			IFileStore fileStore = EFS.getLocalFileSystem().getStore(file.toURI());
 			IWorkbenchPage page = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
 			
-			if (page != null) {
-				IEditorPart editor = IDE.openEditorOnFileStore(page, fileStore);
+			if (page == null) {
+				MessageDialog.openError(getSite().getShell(), "오류", 
+						"워크벤치 페이지를 찾을 수 없습니다.");
+				return;
+			}
+			
+			// 에디터가 활성화될 때까지 기다리기 위한 리스너
+			final int targetLine = lineNumber;
+			final IWorkbenchPage finalPage = page;
+			
+			IPartListener partListener = new IPartListener() {
+				@Override
+				public void partOpened(IWorkbenchPart part) {}
 				
-				// 라인 번호가 유효하면 해당 라인으로 이동
-				if (lineNumber > 0 && editor instanceof ITextEditor) {
-					ITextEditor textEditor = (ITextEditor) editor;
-					IDocument document = textEditor.getDocumentProvider()
-							.getDocument(textEditor.getEditorInput());
-					
-					if (document != null) {
+				@Override
+				public void partDeactivated(IWorkbenchPart part) {}
+				
+				@Override
+				public void partClosed(IWorkbenchPart part) {}
+				
+				@Override
+				public void partBroughtToTop(IWorkbenchPart part) {}
+				
+				@Override
+				public void partActivated(IWorkbenchPart part) {
+					if (part instanceof IEditorPart) {
+						IEditorPart editor = (IEditorPart) part;
+						// 파일 경로가 일치하는지 확인
 						try {
-							// 라인 번호는 1부터 시작하지만 getLineOffset은 0부터 시작
-							int offset = document.getLineOffset(lineNumber - 1);
-							textEditor.selectAndReveal(offset, 0);
+							Object input = editor.getEditorInput().getAdapter(IFileStore.class);
+							if (input != null || editor.getEditorInput().getName().equals(file.getName())) {
+								finalPage.removePartListener(this);
+								// 에디터가 활성화된 후 라인으로 이동
+								Display.getCurrent().asyncExec(() -> {
+									navigateToLineInEditor(editor, targetLine);
+								});
+							}
 						} catch (Exception e) {
-							System.err.println("라인 이동 오류: " + e.getMessage());
+							// 무시하고 계속 진행
 						}
 					}
 				}
+			};
+			
+			page.addPartListener(partListener);
+			
+			IEditorPart editor = IDE.openEditorOnFileStore(page, fileStore);
+			System.out.println("에디터 타입: " + (editor != null ? editor.getClass().getName() : "null"));
+			System.out.println("ITextEditor 인스턴스인가? " + (editor instanceof ITextEditor));
+			
+			// 라인 번호가 유효하면 해당 라인으로 이동
+			if (lineNumber > 0) {
+				// 즉시 시도
+				navigateToLineInEditor(editor, lineNumber);
+				
+				// 에디터가 활성화될 때도 시도 (백업)
+				Display.getCurrent().timerExec(500, () -> {
+					IEditorPart activeEditor = finalPage.getActiveEditor();
+					if (activeEditor == editor) {
+						navigateToLineInEditor(activeEditor, lineNumber);
+					}
+				});
 			}
 		} catch (PartInitException e) {
 			MessageDialog.openError(getSite().getShell(), "오류", 
 					"파일을 열 수 없습니다: " + e.getMessage());
+			e.printStackTrace();
+		} catch (Exception e) {
+			MessageDialog.openError(getSite().getShell(), "오류", 
+					"파일을 열는 중 오류가 발생했습니다: " + e.getMessage());
+			e.printStackTrace();
 		}
+	}
+	
+	/**
+	 * 에디터에서 특정 라인으로 이동을 시도합니다.
+	 */
+	private void navigateToLineInEditor(IEditorPart editor, int lineNumber) {
+		if (editor == null || lineNumber <= 0) {
+			return;
+		}
+		
+		ITextEditor textEditor = null;
+		
+		if (editor instanceof ITextEditor) {
+			textEditor = (ITextEditor) editor;
+		} else {
+			// 어댑터를 통해 ITextEditor를 얻어보기
+			textEditor = editor.getAdapter(ITextEditor.class);
+		}
+		
+		if (textEditor != null) {
+			System.out.println("텍스트 에디터로 라인 이동 시도: " + lineNumber);
+			navigateToLine(textEditor, lineNumber, 0);
+		} else {
+			System.out.println("경고: 에디터가 ITextEditor가 아닙니다. 타입: " + 
+					(editor != null ? editor.getClass().getName() : "null"));
+		}
+	}
+	
+	/**
+	 * 에디터가 완전히 로드될 때까지 재시도하면서 특정 라인으로 이동합니다.
+	 */
+	private void navigateToLine(ITextEditor textEditor, int lineNumber, int retryCount) {
+		System.out.println("라인 이동 시도 (재시도 " + retryCount + "): 라인 " + lineNumber);
+		
+		Display.getCurrent().asyncExec(() -> {
+			try {
+				// 에디터가 disposed되었는지 확인
+				if (textEditor.getEditorSite() == null || 
+					textEditor.getEditorSite().getShell() == null ||
+					textEditor.getEditorSite().getShell().isDisposed()) {
+					System.out.println("에디터가 disposed되었습니다.");
+					return;
+				}
+				
+				IDocument document = textEditor.getDocumentProvider()
+						.getDocument(textEditor.getEditorInput());
+				
+				if (document == null) {
+					System.out.println("문서가 null입니다. 재시도...");
+					if (retryCount < 30) {
+						Display.getCurrent().timerExec(100, () -> {
+							navigateToLine(textEditor, lineNumber, retryCount + 1);
+						});
+					}
+					return;
+				}
+				
+				int totalLines = document.getNumberOfLines();
+				System.out.println("문서 총 라인 수: " + totalLines);
+				
+				if (totalLines > 0) {
+					// 라인 번호가 문서 범위 내에 있는지 확인
+					int targetLine = lineNumber;
+					if (targetLine > totalLines) {
+						System.out.println("라인 번호가 범위를 벗어남. " + targetLine + " > " + totalLines);
+						targetLine = totalLines;
+					}
+					if (targetLine < 1) {
+						targetLine = 1;
+					}
+					
+					System.out.println("목표 라인: " + targetLine);
+					
+					// 라인 번호는 1부터 시작하지만 getLineOffset은 0부터 시작
+					int lineIndex = targetLine - 1;
+					
+					try {
+						// 라인 정보 가져오기
+						IRegion lineInfo = document.getLineInformation(lineIndex);
+						int offset = lineInfo.getOffset();
+						int length = lineInfo.getLength();
+						
+						System.out.println("라인 오프셋: " + offset + ", 라인 길이: " + length);
+						
+						// 에디터에 포커스 설정 (먼저)
+						textEditor.setFocus();
+						
+						// 라인 시작 위치로 이동하고 선택
+						// offset 위치에 커서를 두고, 0 길이로 선택 (커서만 이동)
+						textEditor.selectAndReveal(offset, 0);
+						
+						// 추가로 한 번 더 시도 (때로는 한 번만으로는 작동하지 않음)
+						Display.getCurrent().timerExec(100, () -> {
+							try {
+								textEditor.selectAndReveal(offset, 0);
+								textEditor.setFocus();
+							} catch (Exception e) {
+								// 무시
+							}
+						});
+						
+						System.out.println("라인 이동 완료! 라인 " + targetLine + "로 이동했습니다.");
+					} catch (BadLocationException e) {
+						System.err.println("BadLocationException: 라인 " + lineIndex + " - " + e.getMessage());
+						if (retryCount < 30) {
+							Display.getCurrent().timerExec(100, () -> {
+								navigateToLine(textEditor, lineNumber, retryCount + 1);
+							});
+						}
+					}
+				} else if (retryCount < 30) {
+					// 문서가 아직 로드되지 않았으면 재시도 (최대 30번)
+					System.out.println("문서가 아직 로드되지 않음. 재시도...");
+					Display.getCurrent().timerExec(100, () -> {
+						navigateToLine(textEditor, lineNumber, retryCount + 1);
+					});
+				} else {
+					System.err.println("문서 로드 실패: 최대 재시도 횟수 초과");
+				}
+			} catch (Exception e) {
+				System.err.println("라인 이동 중 예외 발생: " + e.getClass().getName() + " - " + e.getMessage());
+				e.printStackTrace();
+				if (retryCount < 30) {
+					// 오류 발생 시 재시도 (최대 30번)
+					Display.getCurrent().timerExec(100, () -> {
+						navigateToLine(textEditor, lineNumber, retryCount + 1);
+					});
+				} else {
+					System.err.println("라인 이동 오류 (재시도 실패): " + e.getMessage());
+				}
+			}
+		});
 	}
 	
 	/**
@@ -351,12 +658,21 @@ public class XmlValidationView extends ViewPart {
 		try {
 			ruleParser = new YamlRuleParser();
 			ruleParser.parse(ruleFile);
-			currentRuleFile = ruleFile;
+			
+			// 규칙 파일 경로를 정규화하여 저장 (심볼릭 링크 등 해결)
+			try {
+				currentRuleFile = ruleFile.getCanonicalFile();
+			} catch (Exception e) {
+				currentRuleFile = ruleFile;
+			}
 			
 			// 파일명만 표시
 			rulePathText.setText(ruleFile.getName());
 			statusLabel.setText("규칙 파일 로드 완료: " + ruleFile.getName());
 			System.out.println("규칙 파일 로드 성공!");
+			System.out.println("  저장된 규칙 파일 경로: " + currentRuleFile.getAbsolutePath());
+			System.out.println("  정규화된 경로: " + (currentRuleFile.getCanonicalPath()));
+			System.out.println("  부모 디렉토리: " + (currentRuleFile.getParentFile() != null ? currentRuleFile.getParentFile().getAbsolutePath() : "null"));
 			System.out.println("파싱된 규칙 수: " + (ruleParser.getRules() != null ? ruleParser.getRules().size() : 0));
 			System.out.println("파싱된 코드값 수: " + (ruleParser.getCodeValues() != null ? ruleParser.getCodeValues().size() : 0));
 		} catch (Exception e) {
@@ -468,12 +784,15 @@ public class XmlValidationView extends ViewPart {
 				selectedXmlFiles.add(new File(filterPath, fileName));
 			}
 			
+			String pathToAdd;
 			if (fileNames.length == 1) {
-				xmlPathText.setText(selectedXmlFiles.get(0).getAbsolutePath());
+				pathToAdd = selectedXmlFiles.get(0).getAbsolutePath();
 			} else {
-				xmlPathText.setText(filterPath);
+				pathToAdd = filterPath;
 			}
 			
+			xmlPathCombo.setText(pathToAdd);
+			addToHistory(pathToAdd);
 			statusLabel.setText(selectedXmlFiles.size() + "개 XML 파일이 선택되었습니다.");
 		}
 	}
@@ -488,9 +807,36 @@ public class XmlValidationView extends ViewPart {
 		
 		String selectedPath = dialog.open();
 		if (selectedPath != null) {
-			xmlPathText.setText(selectedPath);
+			xmlPathCombo.setText(selectedPath);
+			addToHistory(selectedPath);
 			updateSelectedFiles(selectedPath);
 		}
+	}
+	
+	/**
+	 * 경로를 히스토리에 추가합니다.
+	 */
+	private void addToHistory(String path) {
+		if (path == null || path.trim().isEmpty()) {
+			return;
+		}
+		
+		String normalizedPath = path.trim();
+		
+		// 이미 존재하는 경로는 제거 (중복 방지)
+		xmlPathHistory.remove(normalizedPath);
+		
+		// 맨 앞에 추가
+		xmlPathHistory.add(0, normalizedPath);
+		
+		// 최대 크기 제한
+		if (xmlPathHistory.size() > MAX_HISTORY_SIZE) {
+			xmlPathHistory = xmlPathHistory.subList(0, MAX_HISTORY_SIZE);
+		}
+		
+		// Combo 목록 업데이트
+		xmlPathCombo.setItems(xmlPathHistory.toArray(new String[0]));
+		xmlPathCombo.setText(normalizedPath);
 	}
 	
 	/**
@@ -537,9 +883,50 @@ public class XmlValidationView extends ViewPart {
 		dialog.setFilterNames(new String[] { "YAML Files (*.yaml, *.yml)", "All Files (*.*)" });
 		dialog.setText("규칙 파일 선택");
 		
-		// 현재 규칙 파일이 있으면 해당 경로를 기본으로 설정
-		if (currentRuleFile != null && currentRuleFile.getParentFile() != null) {
-			dialog.setFilterPath(currentRuleFile.getParentFile().getAbsolutePath());
+		// 현재 규칙 파일이 있으면 해당 경로와 파일명을 기본으로 설정
+		if (currentRuleFile != null && currentRuleFile.exists()) {
+			try {
+				File parentDir = currentRuleFile.getParentFile();
+				if (parentDir != null && parentDir.exists()) {
+					// 절대 경로를 정규화 (심볼릭 링크 등 해결)
+					String parentPath = parentDir.getCanonicalPath();
+					
+					System.out.println("======================================");
+					System.out.println("규칙 파일 다이얼로그 초기 경로 설정");
+					System.out.println("  현재 규칙 파일: " + currentRuleFile.getAbsolutePath());
+					System.out.println("  정규화된 부모 경로: " + parentPath);
+					System.out.println("  부모 디렉토리 존재: " + parentDir.exists());
+					
+					// Windows에서 FileDialog 경로 설정
+					// setFilterPath는 Windows에서 때때로 작동하지 않을 수 있음
+					// 하지만 일단 시도해봄
+					dialog.setFilterPath(parentPath);
+					dialog.setFileName(currentRuleFile.getName());
+					
+					// 설정 확인
+					String setFilterPath = dialog.getFilterPath();
+					String setFileName = dialog.getFileName();
+					System.out.println("  설정된 FilterPath: " + setFilterPath);
+					System.out.println("  설정된 FileName: " + setFileName);
+					System.out.println("======================================");
+					
+					// Windows에서 setFilterPath가 무시될 수 있으므로
+					// 다이얼로그를 열기 전에 경로를 확인하고 필요시 재설정
+					// 참고: Windows FileDialog는 때때로 setFilterPath를 무시할 수 있음
+					// 이는 Windows API의 제한사항일 수 있음
+				} else {
+					System.out.println("경고: 부모 디렉토리가 존재하지 않음");
+				}
+			} catch (Exception e) {
+				System.err.println("규칙 파일 경로 설정 오류: " + e.getMessage());
+				e.printStackTrace();
+			}
+		} else {
+			System.out.println("현재 규칙 파일 정보:");
+			System.out.println("  currentRuleFile: " + (currentRuleFile != null ? currentRuleFile.getAbsolutePath() : "null"));
+			if (currentRuleFile != null) {
+				System.out.println("  파일 존재: " + currentRuleFile.exists());
+			}
 		}
 		
 		String ruleFilePath = dialog.open();
@@ -552,16 +939,44 @@ public class XmlValidationView extends ViewPart {
 	}
 	
 	/**
+	 * 파일 수정 시간을 확인하고 변경된 파일을 다시 로드합니다.
+	 */
+	private void checkAndReloadModifiedFiles() {
+		List<File> filesToReload = new ArrayList<>();
+		
+		for (File file : selectedXmlFiles) {
+			String filePath = file.getAbsolutePath();
+			long currentModified = file.lastModified();
+			Long lastKnownModified = fileLastModifiedMap.get(filePath);
+			
+			// 파일이 수정되었거나 처음 검증하는 경우
+			if (lastKnownModified == null || currentModified != lastKnownModified) {
+				filesToReload.add(file);
+				fileLastModifiedMap.put(filePath, currentModified);
+				System.out.println("파일 수정 감지: " + file.getName() + 
+						(lastKnownModified == null ? " (첫 검증)" : " (수정됨)"));
+			}
+		}
+		
+		if (!filesToReload.isEmpty()) {
+			System.out.println("수정된 파일 " + filesToReload.size() + "개를 다시 로드합니다.");
+		}
+	}
+	
+	/**
 	 * 검증 수행
 	 */
 	private void performValidation() {
 		// XML 파일 확인 - 항상 경로에서 다시 수집
-		String xmlPath = xmlPathText.getText().trim();
+		String xmlPath = xmlPathCombo.getText().trim();
 		if (xmlPath.isEmpty()) {
 			MessageDialog.openWarning(getSite().getShell(), "경고", 
 					"XML 파일 또는 폴더를 선택해주세요.");
 			return;
 		}
+		
+		// 히스토리에 추가
+		addToHistory(xmlPath);
 		
 		// 경로에서 파일 수집
 		updateSelectedFiles(xmlPath);
@@ -599,7 +1014,43 @@ public class XmlValidationView extends ViewPart {
 		statusLabel.setText("검증 중... (0/" + selectedXmlFiles.size() + ")");
 		
 		for (int i = 0; i < selectedXmlFiles.size(); i++) {
-			File xmlFile = selectedXmlFiles.get(i);
+			File originalFile = selectedXmlFiles.get(i);
+			String filePath = originalFile.getAbsolutePath();
+			
+			// 항상 최신 파일 객체를 생성하여 사용 (캐시 문제 방지)
+			File xmlFile = new File(filePath);
+			
+			// 파일이 존재하는지 확인
+			if (!xmlFile.exists()) {
+				System.err.println("파일이 존재하지 않습니다: " + filePath);
+				allErrors.add(new ValidationError(xmlFile, -1, -1, 
+						"파일이 존재하지 않습니다: " + filePath,
+						ValidationError.ErrorType.SYNTAX));
+				invalidCount++;
+				continue;
+			}
+			
+			// 파일 수정 시간 확인 및 로깅
+			long currentModified = xmlFile.lastModified();
+			Long lastKnownModified = fileLastModifiedMap.get(filePath);
+			
+			if (lastKnownModified != null && currentModified != lastKnownModified) {
+				System.out.println("파일 수정 감지: " + xmlFile.getName() + 
+						" (수정 시간: " + lastKnownModified + " -> " + currentModified + ")");
+			} else if (lastKnownModified == null) {
+				System.out.println("파일 첫 검증: " + xmlFile.getName() + " (수정 시간: " + currentModified + ")");
+			} else {
+				System.out.println("파일 재검증: " + xmlFile.getName() + " (수정 시간: " + currentModified + ")");
+			}
+			
+			// 파일 수정 시간 저장
+			fileLastModifiedMap.put(filePath, currentModified);
+			
+			// 파일 내용 강제 리프레시를 위해 파일을 다시 읽음
+			// FileInputStream을 사용하면 항상 최신 내용을 읽습니다
+			System.out.println("파일 검증 시작: " + xmlFile.getAbsolutePath() + 
+					" (크기: " + xmlFile.length() + " bytes, 수정 시간: " + currentModified + ")");
+			
 			boolean hasError = false;
 			
 			// 1. 문법 체크
@@ -648,12 +1099,15 @@ public class XmlValidationView extends ViewPart {
 			});
 		}
 		
-		// 결과 표시
-		tableViewer.setInput(allErrors);
+		// 새로운 오류를 기존 오류 리스트의 앞에 추가 (최신 오류가 상단에 표시)
+		allValidationErrors.addAll(0, allErrors);
+		
+		// 결과 표시 (모든 오류 포함)
+		tableViewer.setInput(allValidationErrors);
 		
 		// 상태 메시지 업데이트
-		String statusMessage = String.format("검증 완료: 총 %d개 파일 (성공: %d, 실패: %d, 오류: %d건)",
-				selectedXmlFiles.size(), validCount, invalidCount, allErrors.size());
+		String statusMessage = String.format("검증 완료: 총 %d개 파일 (성공: %d, 실패: %d, 오류: %d건) | 전체 누적 오류: %d건",
+				selectedXmlFiles.size(), validCount, invalidCount, allErrors.size(), allValidationErrors.size());
 		statusLabel.setText(statusMessage);
 		
 		// 결과 메시지
@@ -665,6 +1119,15 @@ public class XmlValidationView extends ViewPart {
 					selectedXmlFiles.size() + "개 파일 중 " + invalidCount + "개 파일에서 " + 
 					allErrors.size() + "건의 오류가 발견되었습니다.");
 		}
+	}
+	
+	/**
+	 * 모든 오류 메시지를 삭제합니다.
+	 */
+	private void clearAllErrors() {
+		allValidationErrors.clear();
+		tableViewer.setInput(allValidationErrors);
+		statusLabel.setText("모든 오류 메시지가 삭제되었습니다.");
 	}
 	
 	/**

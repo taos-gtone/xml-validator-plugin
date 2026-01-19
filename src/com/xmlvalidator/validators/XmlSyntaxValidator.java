@@ -46,6 +46,22 @@ public class XmlSyntaxValidator {
 	public boolean validate(File xmlFile) {
 		errors.clear();
 		
+		// 파일이 존재하는지 확인
+		if (!xmlFile.exists()) {
+			System.err.println("파일이 존재하지 않습니다: " + xmlFile.getAbsolutePath());
+			errors.add(new ValidationError(xmlFile, -1, -1, 
+					"파일이 존재하지 않습니다: " + xmlFile.getAbsolutePath(),
+					ValidationError.ErrorType.SYNTAX));
+			return false;
+		}
+		
+		// 파일 정보 로깅 (최신 정보 확인)
+		long fileSize = xmlFile.length();
+		long lastModified = xmlFile.lastModified();
+		System.out.println("문법 검증 시작: " + xmlFile.getName() + 
+				" (크기: " + fileSize + " bytes, 수정 시간: " + lastModified + ")");
+		
+		// DocumentBuilderFactory를 매번 새로 생성하여 캐시 방지
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 		factory.setValidating(false);
 		factory.setNamespaceAware(true);
@@ -54,13 +70,18 @@ public class XmlSyntaxValidator {
 			DocumentBuilder builder = factory.newDocumentBuilder();
 			builder.setErrorHandler(new XmlErrorHandler(xmlFile));
 			
+			// 항상 FileInputStream을 사용하여 최신 파일 내용을 읽음
 			try (FileInputStream fis = new FileInputStream(xmlFile)) {
 				if (encoding != null && !encoding.isEmpty()) {
 					org.xml.sax.InputSource is = new org.xml.sax.InputSource(fis);
 					is.setEncoding(encoding);
+					// SystemId를 설정하여 파일 경로 명시
+					is.setSystemId(xmlFile.toURI().toString());
 					builder.parse(is);
 				} else {
-					builder.parse(fis);
+					org.xml.sax.InputSource is = new org.xml.sax.InputSource(fis);
+					is.setSystemId(xmlFile.toURI().toString());
+					builder.parse(is);
 				}
 			}
 			

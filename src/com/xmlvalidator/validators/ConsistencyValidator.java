@@ -49,35 +49,100 @@ public class ConsistencyValidator {
 		errors.clear();
 		elementLineNumbers.clear();
 		
+		// 파일이 존재하는지 확인
+		if (!xmlFile.exists()) {
+			System.err.println("파일이 존재하지 않습니다: " + xmlFile.getAbsolutePath());
+			addError(xmlFile, -1, -1, "파일이 존재하지 않습니다: " + xmlFile.getAbsolutePath());
+			return false;
+		}
+		
+		// 파일 정보 로깅 (최신 정보 확인)
+		long fileSize = xmlFile.length();
+		long lastModified = xmlFile.lastModified();
 		System.out.println("정합성 검증 시작: " + xmlFile.getName());
+		System.out.println("파일 정보: 크기=" + fileSize + " bytes, 수정 시간=" + lastModified);
+		
+		// XML 파일에서 KSIC Code 속성 값을 직접 읽어서 확인 (디버깅용)
+		try {
+			String encoding = ruleParser.getEncoding();
+			if (encoding == null || encoding.isEmpty()) {
+				encoding = "UTF-8";
+			}
+			try (BufferedReader reader = new BufferedReader(
+					new InputStreamReader(new FileInputStream(xmlFile), encoding))) {
+				String line;
+				int lineNum = 0;
+				while ((line = reader.readLine()) != null) {
+					lineNum++;
+					// KSIC 요소와 Code 속성을 찾기
+					if (line.contains("KSIC") && line.contains("Code=")) {
+						System.out.println("========================================");
+						System.out.println("XML 파일 원시 라인 발견 (라인 " + lineNum + "):");
+						System.out.println("  원시 라인: " + line);
+						
+						// Code 속성 값 추출 (정규식 사용)
+						java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("Code\\s*=\\s*\"([^\"]+)\"");
+						java.util.regex.Matcher matcher = pattern.matcher(line);
+						if (matcher.find()) {
+							String rawCodeValue = matcher.group(1);
+							System.out.println("  추출된 Code 값: '" + rawCodeValue + "'");
+							System.out.println("  Code 값 문자 길이: " + rawCodeValue.length());
+							byte[] codeBytes = rawCodeValue.getBytes(encoding);
+							System.out.println("  Code 값 바이트 길이: " + codeBytes.length);
+							StringBuilder hex = new StringBuilder();
+							for (byte b : codeBytes) {
+								hex.append(String.format("%02X ", b));
+							}
+							System.out.println("  Code 값 바이트 (HEX): " + hex.toString().trim());
+							System.out.println("  Code 값 각 문자: " + getCharDetails(rawCodeValue));
+						}
+						System.out.println("========================================");
+					}
+				}
+			}
+		} catch (Exception e) {
+			System.err.println("XML 파일 원시 읽기 오류: " + e.getMessage());
+			e.printStackTrace();
+		}
 		
 		try {
 			// 인코딩 처리
 			String encoding = ruleParser.getEncoding();
 			System.out.println("인코딩: " + encoding);
 			
-			// 먼저 라인 번호 매핑 생성
+			// 먼저 라인 번호 매핑 생성 (항상 최신 파일에서 읽음)
 			buildLineNumberMap(xmlFile, encoding);
 			
+			// DocumentBuilderFactory를 매번 새로 생성하여 캐시 방지
 			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 			factory.setNamespaceAware(true);
+			// 캐시 방지를 위한 추가 설정
+			factory.setValidating(false);
 			DocumentBuilder builder = factory.newDocumentBuilder();
 			
+			// 항상 FileInputStream을 사용하여 최신 파일 내용을 읽음
 			Document doc;
 			if (encoding != null && !encoding.isEmpty()) {
 				try (FileInputStream fis = new FileInputStream(xmlFile)) {
 					org.xml.sax.InputSource is = new org.xml.sax.InputSource(fis);
 					is.setEncoding(encoding);
+					// SystemId를 설정하여 파일 경로 명시
+					is.setSystemId(xmlFile.toURI().toString());
 					doc = builder.parse(is);
 				}
 			} else {
-				doc = builder.parse(xmlFile);
+				// 인코딩이 없어도 FileInputStream을 사용하여 최신 내용 보장
+				try (FileInputStream fis = new FileInputStream(xmlFile)) {
+					org.xml.sax.InputSource is = new org.xml.sax.InputSource(fis);
+					is.setSystemId(xmlFile.toURI().toString());
+					doc = builder.parse(is);
+				}
 			}
 			
 			// 루트 요소 검증
 			Element root = doc.getDocumentElement();
 			if (root == null) {
-				errors.add(new ValidationError(xmlFile, 1, -1, "XML 파일에 루트 요소가 없습니다."));
+				addError(xmlFile, 1, -1, "XML 파일에 루트 요소가 없습니다.");
 				return false;
 			}
 			
@@ -89,6 +154,31 @@ public class ConsistencyValidator {
 			System.out.println("STR 규칙 존재 여부: " + (strRule != null));
 			if (strRule != null) {
 				System.out.println("STR 규칙 키: " + strRule.keySet());
+				
+				// children 규칙 확인
+				Map<String, Object> children = (Map<String, Object>) strRule.get("children");
+				if (children != null) {
+					System.out.println("STR children 규칙: " + children.keySet());
+					// KSIC 규칙 확인
+					if (children.containsKey("KSIC")) {
+						Map<String, Object> ksicRule = (Map<String, Object>) children.get("KSIC");
+						System.out.println("KSIC 규칙 발견!");
+						System.out.println("KSIC 규칙 내용: " + ksicRule);
+						Map<String, Object> ksicAttrs = (Map<String, Object>) ksicRule.get("attributes");
+						if (ksicAttrs != null) {
+							System.out.println("KSIC attributes 규칙: " + ksicAttrs);
+							if (ksicAttrs.containsKey("Code")) {
+								Map<String, Object> codeRule = (Map<String, Object>) ksicAttrs.get("Code");
+								System.out.println("KSIC Code 속성 규칙: " + codeRule);
+							}
+						}
+					} else {
+						System.out.println("경고: STR children에 KSIC 규칙이 없습니다!");
+					}
+				} else {
+					System.out.println("경고: STR children 규칙이 없습니다!");
+				}
+				
 				validateElement(xmlFile, root, strRule, "STR");
 			} else {
 				System.out.println("경고: STR 규칙이 없습니다!");
@@ -100,8 +190,7 @@ public class ConsistencyValidator {
 		} catch (Exception e) {
 			System.err.println("정합성 검사 예외: " + e.getMessage());
 			e.printStackTrace();
-			errors.add(new ValidationError(xmlFile, 1, -1, 
-					"정합성 검사 오류: " + e.getMessage()));
+			addError(xmlFile, 1, -1, "정합성 검사 오류: " + e.getMessage());
 			return false;
 		}
 	}
@@ -144,6 +233,7 @@ public class ConsistencyValidator {
 	
 	/**
 	 * 요소 이름으로 라인 번호를 찾습니다.
+	 * 같은 이름의 요소가 여러 개 있을 때는 첫 번째 요소의 라인 번호를 반환합니다.
 	 */
 	private int getLineNumber(String elementName) {
 		Integer lineNum = elementLineNumbers.get(elementName);
@@ -151,14 +241,197 @@ public class ConsistencyValidator {
 	}
 	
 	/**
+	 * 요소의 실제 라인 번호를 찾습니다.
+	 * 요소의 경로와 내용을 사용하여 정확한 라인을 찾습니다.
+	 */
+	private int findElementLineNumber(File xmlFile, Element element, String path, String encoding) {
+		try (BufferedReader reader = new BufferedReader(
+				new InputStreamReader(new FileInputStream(xmlFile), 
+						encoding != null ? encoding : "UTF-8"))) {
+			
+			String line;
+			int lineNumber = 0;
+			String elementName = element.getLocalName();
+			if (elementName == null) {
+				elementName = element.getNodeName();
+				if (elementName.contains(":")) {
+					elementName = elementName.substring(elementName.indexOf(":") + 1);
+				}
+			}
+			
+			// 요소의 Code 속성 값으로 정확한 요소를 찾기
+			String codeValue = null;
+			if (element.hasAttribute("Code")) {
+				codeValue = element.getAttribute("Code");
+			}
+			
+			// 경로에서 마지막 요소 이름 추출
+			String searchElementName = path.contains("/") ? 
+					path.substring(path.lastIndexOf("/") + 1) : path;
+			
+			// 정규식 패턴: 요소 이름과 Code 속성 (있는 경우)
+			String patternStr;
+			if (codeValue != null && !codeValue.isEmpty()) {
+				// Code 속성이 있는 경우: Code 속성 값으로 정확히 매칭
+				patternStr = "<" + Pattern.quote(searchElementName) + "\\s+Code\\s*=\\s*\"" + 
+						Pattern.quote(codeValue) + "\"";
+			} else {
+				// Code 속성이 없는 경우: 요소 이름만으로 찾기
+				patternStr = "<" + Pattern.quote(searchElementName) + "(?:\\s|>|/)";
+			}
+			
+			Pattern pattern = Pattern.compile(patternStr);
+			int matchCount = 0;
+			int targetMatch = -1;
+			
+			// 같은 경로의 요소 중 몇 번째인지 찾기
+			// 부모 경로를 사용하여 같은 경로의 요소들을 그룹화
+			String parentPath = path.contains("/") ? 
+					path.substring(0, path.lastIndexOf("/")) : "";
+			
+			// 먼저 같은 경로의 요소가 몇 번째인지 계산
+			// 이는 DOM 트리에서의 순서를 추적해야 함
+			// 간단한 방법: 같은 부모 아래에서 같은 이름의 요소 중 몇 번째인지
+			if (element.getParentNode() != null && element.getParentNode() instanceof Element) {
+				Element parent = (Element) element.getParentNode();
+				NodeList siblings = parent.getChildNodes();
+				int index = 0;
+				for (int i = 0; i < siblings.getLength(); i++) {
+					Node sibling = siblings.item(i);
+					if (sibling instanceof Element) {
+						Element siblingElem = (Element) sibling;
+						String siblingName = siblingElem.getLocalName();
+						if (siblingName == null) {
+							siblingName = siblingElem.getNodeName();
+							if (siblingName.contains(":")) {
+								siblingName = siblingName.substring(siblingName.indexOf(":") + 1);
+							}
+						}
+						if (siblingName.equals(elementName)) {
+							index++;
+							if (siblingElem == element) {
+								targetMatch = index;
+								break;
+							}
+						}
+					}
+				}
+			}
+			
+			// XML 파일에서 해당 요소 찾기
+			while ((line = reader.readLine()) != null) {
+				lineNumber++;
+				Matcher matcher = pattern.matcher(line);
+				
+				if (matcher.find()) {
+					matchCount++;
+					// Code 속성으로 매칭한 경우 정확히 일치
+					if (codeValue != null && !codeValue.isEmpty()) {
+						// Code 값이 일치하면 바로 반환
+						return lineNumber;
+					} else if (targetMatch > 0 && matchCount == targetMatch) {
+						// 같은 이름의 요소 중 targetMatch 번째 요소
+						return lineNumber;
+					} else if (targetMatch <= 0 && matchCount == 1) {
+						// 첫 번째 매칭 (fallback)
+						return lineNumber;
+					}
+				}
+			}
+			
+			// 찾지 못한 경우 첫 번째 요소의 라인 번호 반환
+			return getLineNumber(elementName);
+			
+		} catch (java.io.UnsupportedEncodingException e) {
+			System.err.println("인코딩 오류: " + encoding + " - " + e.getMessage());
+			// UTF-8로 재시도
+			try (BufferedReader reader = new BufferedReader(
+					new InputStreamReader(new FileInputStream(xmlFile), "UTF-8"))) {
+				return findElementLineNumberWithReader(reader, element, path);
+			} catch (Exception e2) {
+				System.err.println("요소 라인 번호 찾기 오류 (재시도 실패): " + e2.getMessage());
+				return getLineNumber(element.getNodeName());
+			}
+		} catch (Exception e) {
+			System.err.println("요소 라인 번호 찾기 오류: " + e.getMessage());
+			e.printStackTrace();
+			// 오류 발생 시 기본 방법 사용
+			return getLineNumber(element.getNodeName());
+		}
+	}
+	
+	/**
+	 * BufferedReader를 사용하여 요소의 라인 번호를 찾습니다 (헬퍼 메서드).
+	 */
+	private int findElementLineNumberWithReader(BufferedReader reader, Element element, String path) throws Exception {
+		String line;
+		int lineNumber = 0;
+		String elementName = element.getLocalName();
+		if (elementName == null) {
+			elementName = element.getNodeName();
+			if (elementName.contains(":")) {
+				elementName = elementName.substring(elementName.indexOf(":") + 1);
+			}
+		}
+		
+		// 요소의 Code 속성 값으로 정확한 요소를 찾기
+		String codeValue = null;
+		if (element.hasAttribute("Code")) {
+			codeValue = element.getAttribute("Code");
+		}
+		
+		// 경로에서 마지막 요소 이름 추출
+		String searchElementName = path.contains("/") ? 
+				path.substring(path.lastIndexOf("/") + 1) : path;
+		
+		// 정규식 패턴: 요소 이름과 Code 속성 (있는 경우)
+		String patternStr;
+		if (codeValue != null && !codeValue.isEmpty()) {
+			// Code 속성이 있는 경우: Code 속성 값으로 정확히 매칭
+			patternStr = "<" + Pattern.quote(searchElementName) + "\\s+Code\\s*=\\s*\"" + 
+					Pattern.quote(codeValue) + "\"";
+		} else {
+			// Code 속성이 없는 경우: 요소 이름만으로 찾기
+			patternStr = "<" + Pattern.quote(searchElementName) + "(?:\\s|>|/)";
+		}
+		
+		Pattern pattern = Pattern.compile(patternStr);
+		
+		// XML 파일에서 해당 요소 찾기
+		while ((line = reader.readLine()) != null) {
+			lineNumber++;
+			Matcher matcher = pattern.matcher(line);
+			
+			if (matcher.find()) {
+				// Code 속성으로 매칭한 경우 정확히 일치
+				if (codeValue != null && !codeValue.isEmpty()) {
+					// Code 값이 일치하면 바로 반환
+					return lineNumber;
+				} else {
+					// 첫 번째 매칭
+					return lineNumber;
+				}
+			}
+		}
+		
+		// 찾지 못한 경우 첫 번째 요소의 라인 번호 반환
+		return getLineNumber(elementName);
+	}
+	
+	/**
 	 * 요소를 검증합니다.
 	 */
 	@SuppressWarnings("unchecked")
 	private void validateElement(File xmlFile, Element element, Map<String, Object> rule, String path) {
+		System.out.println("요소 검증 시작: " + path + " (요소 이름: " + element.getNodeName() + ")");
+		
 		// 1. 속성 검증
 		Map<String, Object> attributes = (Map<String, Object>) rule.get("attributes");
 		if (attributes != null) {
+			System.out.println("속성 검증 규칙 발견: " + attributes.keySet());
 			validateAttributes(xmlFile, element, attributes, path);
+		} else {
+			System.out.println("속성 검증 규칙 없음");
 		}
 		
 		// 2. 필수 여부 검증
@@ -195,13 +468,169 @@ public class ConsistencyValidator {
 	 */
 	@SuppressWarnings("unchecked")
 	private void validateAttributes(File xmlFile, Element element, Map<String, Object> attributes, String path) {
-		int lineNum = getLineNumber(element.getNodeName());
+		// 요소의 실제 라인 번호 찾기 (Code 속성 값 사용)
+		String encoding = null;
+		try {
+			if (ruleParser != null) {
+				encoding = ruleParser.getEncoding();
+			}
+		} catch (Exception e) {
+			System.err.println("인코딩 가져오기 오류: " + e.getMessage());
+		}
+		int lineNum = findElementLineNumber(xmlFile, element, path, encoding);
+		
+		// 디버깅: 요소의 모든 속성 출력
+		NamedNodeMap allAttrs = element.getAttributes();
+		System.out.println("========================================");
+		System.out.println("요소 '" + path + "'의 모든 속성 (총 " + allAttrs.getLength() + "개):");
+		for (int i = 0; i < allAttrs.getLength(); i++) {
+			Node attr = allAttrs.item(i);
+			String attrNodeName = attr.getNodeName();
+			String attrLocalName = attr.getLocalName();
+			String attrValue = attr.getNodeValue();
+			
+			// 바이트 단위 분석
+			byte[] bytes = attrValue != null ? attrValue.getBytes() : new byte[0];
+			StringBuilder byteHex = new StringBuilder();
+			for (byte b : bytes) {
+				byteHex.append(String.format("%02X ", b));
+			}
+			
+			System.out.println("  속성[" + i + "]:");
+			System.out.println("    nodeName='" + attrNodeName + "'");
+			System.out.println("    localName='" + attrLocalName + "'");
+			System.out.println("    value='" + attrValue + "'");
+			System.out.println("    문자 길이: " + (attrValue != null ? attrValue.length() : 0));
+			System.out.println("    바이트 길이: " + bytes.length);
+			System.out.println("    바이트 값 (HEX): " + byteHex.toString().trim());
+			System.out.println("    각 문자: " + (attrValue != null ? getCharDetails(attrValue) : "null"));
+		}
+		System.out.println("========================================");
 		
 		for (Map.Entry<String, Object> entry : attributes.entrySet()) {
 			String attrName = entry.getKey();
 			Object attrRule = entry.getValue();
 			
-			String attrValue = element.getAttribute(attrName);
+			System.out.println("========================================");
+			System.out.println("속성 검증 시작: " + path + "/@" + attrName);
+			System.out.println("속성 규칙 타입: " + (attrRule instanceof Map ? "Map" : attrRule.getClass().getSimpleName()));
+			if (attrRule instanceof Map) {
+				Map<String, Object> attrRuleMap = (Map<String, Object>) attrRule;
+				String type = (String) attrRuleMap.get("type");
+				System.out.println("속성 규칙 type: " + type);
+				if ("enum".equals(type)) {
+					System.out.println(">>> enum 타입 속성 발견: " + attrName);
+				}
+			}
+			
+			// 속성 값 읽기 - 여러 방법 시도
+			String attrValue = null;
+			
+			// 방법 1: NamedNodeMap을 통해 직접 읽기 (가장 안정적)
+			NamedNodeMap attrs = element.getAttributes();
+			for (int i = 0; i < attrs.getLength(); i++) {
+				Node attr = attrs.item(i);
+				String attrNodeName = attr.getNodeName();
+				String attrLocalName = attr.getLocalName();
+				
+				// nodeName 또는 localName이 일치하는지 확인
+				if (attrNodeName.equals(attrName)) {
+					attrValue = attr.getNodeValue();
+					System.out.println(">>> 속성 '" + attrName + "' 발견 (nodeName 일치)");
+					System.out.println("    읽은 값: '" + attrValue + "'");
+					System.out.println("    문자 길이: " + attrValue.length());
+					System.out.println("    바이트 길이: " + attrValue.getBytes().length);
+					System.out.println("    각 문자: " + getCharDetails(attrValue));
+					break;
+				} else if (attrLocalName != null && attrLocalName.equals(attrName)) {
+					attrValue = attr.getNodeValue();
+					System.out.println(">>> 속성 '" + attrName + "' 발견 (localName 일치)");
+					System.out.println("    읽은 값: '" + attrValue + "'");
+					System.out.println("    문자 길이: " + attrValue.length());
+					System.out.println("    바이트 길이: " + attrValue.getBytes().length);
+					System.out.println("    각 문자: " + getCharDetails(attrValue));
+					break;
+				} else if (attrLocalName == null) {
+					// localName이 null인 경우 nodeName에서 콜론 뒤 부분 확인
+					if (attrNodeName.contains(":")) {
+						String localPart = attrNodeName.substring(attrNodeName.indexOf(":") + 1);
+						if (localPart.equals(attrName)) {
+							attrValue = attr.getNodeValue();
+							System.out.println(">>> 속성 '" + attrName + "' 발견 (nodeName에서 추출)");
+							System.out.println("    읽은 값: '" + attrValue + "'");
+							System.out.println("    문자 길이: " + attrValue.length());
+							System.out.println("    바이트 길이: " + attrValue.getBytes().length);
+							System.out.println("    각 문자: " + getCharDetails(attrValue));
+							break;
+						}
+					}
+				}
+			}
+			
+			// 방법 2: getAttribute() 시도 (방법 1이 실패한 경우)
+			if (attrValue == null && element.hasAttribute(attrName)) {
+				attrValue = element.getAttribute(attrName);
+				System.out.println("속성 '" + attrName + "' 발견 (getAttribute): '" + attrValue + "'");
+			}
+			
+			// 방법 3: 네임스페이스 처리 (방법 1, 2가 실패한 경우)
+			if (attrValue == null) {
+				String localName = attrName;
+				if (localName.contains(":")) {
+					localName = localName.substring(localName.indexOf(":") + 1);
+				}
+				if (element.hasAttributeNS(null, localName)) {
+					attrValue = element.getAttributeNS(null, localName);
+					System.out.println("속성 '" + attrName + "' 발견 (getAttributeNS): '" + attrValue + "'");
+				}
+			}
+			
+			// 속성 값이 없으면 빈 문자열로 처리
+			if (attrValue == null) {
+				attrValue = "";
+				System.out.println("경고: 속성 '" + attrName + "'를 찾을 수 없습니다.");
+			}
+			
+			// 공백 제거 (앞뒤 공백만)
+			String originalValue = attrValue;
+			attrValue = attrValue.trim();
+			if (!originalValue.equals(attrValue)) {
+				System.out.println("속성 값 공백 제거: '" + originalValue + "' -> '" + attrValue + "'");
+			}
+			
+			// 속성 규칙이 Map인 경우 required 체크
+			if (attrRule instanceof Map) {
+				Map<String, Object> attrRuleMap = (Map<String, Object>) attrRule;
+				
+				// 속성 필수 여부 확인
+				Object requiredObj = attrRuleMap.get("required");
+				boolean isRequired = false;
+				if (requiredObj != null) {
+					String requiredStr = requiredObj.toString();
+					isRequired = "true".equalsIgnoreCase(requiredStr) || 
+								"required".equalsIgnoreCase(requiredStr) ||
+								"1".equals(requiredStr);
+				}
+				
+				// 필수 속성인데 값이 비어있으면 오류
+				if (isRequired && (attrValue == null || attrValue.isEmpty())) {
+					addError(xmlFile, lineNum, -1,
+							path + " 요소의 " + attrName + " 속성은 필수입니다.");
+					// 필수 속성이 없으면 다른 검증은 건너뜀
+					continue;
+				}
+			}
+			
+			// 디버깅 로그
+			if (attrRule instanceof Map) {
+				Map<String, Object> attrRuleMap = (Map<String, Object>) attrRule;
+				String type = (String) attrRuleMap.get("type");
+				if ("fixed_length".equals(type)) {
+					System.out.println("속성 검증: " + path + "/@" + attrName + 
+							" = '" + attrValue + "' (길이: " + attrValue.length() + 
+							", 바이트 길이: " + attrValue.getBytes().length + ")");
+				}
+			}
 			
 			if (attrRule instanceof Map) {
 				Map<String, Object> attrRuleMap = (Map<String, Object>) attrRule;
@@ -209,12 +638,128 @@ public class ConsistencyValidator {
 				// enum 타입 검증
 				String type = (String) attrRuleMap.get("type");
 				if ("enum".equals(type)) {
+					System.out.println("========================================");
+					System.out.println("enum 검증 시작: " + path + "/@" + attrName);
+					System.out.println("속성 값: '" + attrValue + "'");
+					System.out.println("속성 값 길이: " + attrValue.length());
+					
+					@SuppressWarnings("unchecked")
 					List<String> allowedValues = (List<String>) attrRuleMap.get("allowed_values");
+					System.out.println("허용된 값 목록: " + allowedValues);
+					
 					if (allowedValues != null && !allowedValues.isEmpty()) {
-						if (!attrValue.isEmpty() && !allowedValues.contains(attrValue)) {
-							errors.add(new ValidationError(xmlFile, lineNum, -1,
-									path + " 요소의 " + attrName + " 속성 값 '" + attrValue + 
-									"'이(가) 허용된 값이 아닙니다. 허용값: " + allowedValues));
+						// 필수 속성인 경우 빈 값도 체크
+						Object requiredObj = attrRuleMap.get("required");
+						boolean isRequired = false;
+						if (requiredObj != null) {
+							String requiredStr = requiredObj.toString();
+							isRequired = "true".equalsIgnoreCase(requiredStr) || 
+										"required".equalsIgnoreCase(requiredStr) ||
+										"1".equals(requiredStr);
+						}
+						
+						// 빈 값 체크
+						if (attrValue.isEmpty()) {
+							if (isRequired) {
+								System.err.println("enum 검증 오류: 필수 속성인데 값이 비어있습니다.");
+								addError(xmlFile, lineNum, -1,
+										path + " 요소의 " + attrName + " 속성은 필수입니다.");
+							} else {
+								System.out.println("enum 검증: 선택적 속성이므로 빈 값은 허용됩니다.");
+							}
+						} else {
+							// 허용된 값 목록에 포함되어 있는지 확인
+							boolean isAllowed = allowedValues.contains(attrValue);
+							System.out.println("값 '" + attrValue + "'이(가) 허용 목록에 있는가? " + isAllowed);
+							
+							if (!isAllowed) {
+								String errorMessage = path + " 요소의 " + attrName + " 속성 값 '" + attrValue + 
+										"'이(가) 허용된 값이 아닙니다. 허용값: " + allowedValues;
+								System.err.println("enum 검증 오류: " + errorMessage);
+								addError(xmlFile, lineNum, -1, errorMessage);
+							} else {
+								System.out.println("enum 검증 통과: " + attrName + " = '" + attrValue + "'");
+							}
+						}
+					} else {
+						System.err.println("경고: enum 타입인데 allowed_values가 비어있거나 null입니다.");
+					}
+					System.out.println("========================================");
+				}
+				// fixed_length 타입 검증 (정확한 길이 검증)
+				else if ("fixed_length".equals(type)) {
+					Object lengthObj = attrRuleMap.get("length");
+					if (lengthObj != null) {
+						int requiredLength = Integer.parseInt(lengthObj.toString());
+						System.out.println("fixed_length 검증 시작: " + path + "/@" + attrName + 
+								", 요구 길이: " + requiredLength + 
+								", 실제 값: '" + attrValue + "'");
+						
+						if (attrValue.isEmpty()) {
+							// 빈 값은 필수 검증에서 처리
+							System.out.println("속성 값이 비어있음 - 필수 검증에서 처리");
+						} else {
+							// 실제 문자 길이 확인 (유니코드 문자 기준)
+							int actualLength = attrValue.length();
+							byte[] bytes = attrValue.getBytes();
+							int byteLength = bytes.length;
+							
+							System.out.println("속성 길이 검증: 요구=" + requiredLength + 
+									", 실제 문자 길이=" + actualLength + 
+									", 바이트 길이=" + byteLength);
+							
+							// 각 문자 출력 (디버깅용)
+							System.out.print("속성 값 문자 분석: ");
+							for (int i = 0; i < attrValue.length(); i++) {
+								char c = attrValue.charAt(i);
+								System.out.print("[" + i + "]='" + c + "'(U+" + 
+										Integer.toHexString(c).toUpperCase() + ") ");
+							}
+							System.out.println();
+							
+							if (actualLength != requiredLength) {
+								String errorMessage = path + " 요소의 " + attrName + " 속성 값의 길이가 정확히 " + requiredLength + 
+										"자여야 합니다. 현재 길이: " + actualLength + ", 값: '" + attrValue + 
+										"' (바이트 길이: " + byteLength + ")";
+								System.err.println("속성 길이 오류: " + errorMessage);
+								addError(xmlFile, lineNum, -1, errorMessage);
+							} else {
+								System.out.println("속성 길이 검증 통과: " + attrName + " = '" + attrValue + "'");
+							}
+						}
+					}
+				}
+				// max_length 타입 검증 (최대 길이 검증)
+				else if ("max_length".equals(type)) {
+					Object lengthObj = attrRuleMap.get("length");
+					if (lengthObj != null) {
+						int maxLength = Integer.parseInt(lengthObj.toString());
+						System.out.println("max_length 검증 시작: " + path + "/@" + attrName + 
+								", 최대 길이: " + maxLength + 
+								", 실제 값: '" + attrValue + "'");
+						
+						if (attrValue.isEmpty()) {
+							// 빈 값은 필수 검증에서 처리
+							System.out.println("속성 값이 비어있음 - 필수 검증에서 처리");
+						} else {
+							// 실제 문자 길이 확인 (유니코드 문자 기준)
+							int actualLength = attrValue.length();
+							byte[] bytes = attrValue.getBytes();
+							int byteLength = bytes.length;
+							
+							System.out.println("속성 길이 검증: 최대=" + maxLength + 
+									", 실제 문자 길이=" + actualLength + 
+									", 바이트 길이=" + byteLength);
+							
+							if (actualLength > maxLength) {
+								String errorMessage = path + " 요소의 " + attrName + " 속성 값의 길이가 " + maxLength + 
+										"자를 초과합니다. 현재 길이: " + actualLength + ", 값: '" + attrValue + 
+										"' (바이트 길이: " + byteLength + ")";
+								System.err.println("속성 길이 오류: " + errorMessage);
+								addError(xmlFile, lineNum, -1, errorMessage);
+							} else {
+								System.out.println("속성 길이 검증 통과: " + attrName + " = '" + attrValue + "' (길이: " + actualLength + ")");
+							}
 						}
 					}
 				}
@@ -222,9 +767,9 @@ public class ConsistencyValidator {
 				// 고정 값 검증
 				String expectedValue = (String) attrRule;
 				if (!expectedValue.isEmpty() && !attrValue.equals(expectedValue)) {
-					errors.add(new ValidationError(xmlFile, lineNum, -1,
+					addError(xmlFile, lineNum, -1,
 							path + " 요소의 " + attrName + " 속성 값이 '" + expectedValue + 
-							"'이어야 합니다. 현재 값: '" + attrValue + "'"));
+							"'이어야 합니다. 현재 값: '" + attrValue + "'");
 				}
 			}
 		}
@@ -257,8 +802,8 @@ public class ConsistencyValidator {
 					
 					// 숫자 형식 검증
 					if (!value.matches("-?\\d+(\\.\\d+)?")) {
-						errors.add(new ValidationError(xmlFile, lineNum, -1,
-								path + " 요소의 값 '" + value + "'이(가) 숫자 형식이 아닙니다."));
+						addError(xmlFile, lineNum, -1,
+								path + " 요소의 값 '" + value + "'이(가) 숫자 형식이 아닙니다.");
 					}
 				}
 			} catch (Exception e) {
@@ -270,8 +815,8 @@ public class ConsistencyValidator {
 		if (dataType.matches("\\d+")) {
 			int maxLength = Integer.parseInt(dataType);
 			if (value.length() > maxLength) {
-				errors.add(new ValidationError(xmlFile, lineNum, -1,
-						path + " 요소의 값 길이가 " + maxLength + "자를 초과합니다. 현재 길이: " + value.length()));
+				addError(xmlFile, lineNum, -1,
+						path + " 요소의 값 길이가 " + maxLength + "자를 초과합니다. 현재 길이: " + value.length());
 			}
 		}
 	}
@@ -290,8 +835,8 @@ public class ConsistencyValidator {
 		// YYYYMMDD 형식 검증
 		if (format.contains("YYYYMMDD")) {
 			if (!value.matches("\\d{8}")) {
-				errors.add(new ValidationError(xmlFile, lineNum, -1,
-						path + " 요소의 값 '" + value + "'이(가) YYYYMMDD 형식이 아닙니다."));
+				addError(xmlFile, lineNum, -1,
+						path + " 요소의 값 '" + value + "'이(가) YYYYMMDD 형식이 아닙니다.");
 			} else {
 				// 날짜 유효성 검증
 				try {
@@ -300,8 +845,8 @@ public class ConsistencyValidator {
 					int day = Integer.parseInt(value.substring(6, 8));
 					
 					if (year < 1900 || month < 1 || month > 12 || day < 1 || day > 31) {
-						errors.add(new ValidationError(xmlFile, lineNum, -1,
-								path + " 요소의 날짜 값 '" + value + "'이(가) 유효하지 않습니다."));
+						addError(xmlFile, lineNum, -1,
+								path + " 요소의 날짜 값 '" + value + "'이(가) 유효하지 않습니다.");
 					}
 				} catch (NumberFormatException e) {
 					// 이미 위에서 검증됨
@@ -312,8 +857,8 @@ public class ConsistencyValidator {
 		// HHMISS 형식 검증
 		if (format.contains("HHMISS")) {
 			if (!value.matches("\\d{6}")) {
-				errors.add(new ValidationError(xmlFile, lineNum, -1,
-						path + " 요소의 값 '" + value + "'이(가) HHMISS 형식이 아닙니다."));
+				addError(xmlFile, lineNum, -1,
+						path + " 요소의 값 '" + value + "'이(가) HHMISS 형식이 아닙니다.");
 			} else {
 				try {
 					int hour = Integer.parseInt(value.substring(0, 2));
@@ -321,8 +866,8 @@ public class ConsistencyValidator {
 					int second = Integer.parseInt(value.substring(4, 6));
 					
 					if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) {
-						errors.add(new ValidationError(xmlFile, lineNum, -1,
-								path + " 요소의 시간 값 '" + value + "'이(가) 유효하지 않습니다."));
+						addError(xmlFile, lineNum, -1,
+								path + " 요소의 시간 값 '" + value + "'이(가) 유효하지 않습니다.");
 					}
 				} catch (NumberFormatException e) {
 					// 이미 위에서 검증됨
@@ -334,8 +879,8 @@ public class ConsistencyValidator {
 		if (format.contains("금칙어")) {
 			if (value.contains("<") || value.contains(">") || 
 				value.contains("\"") || value.contains(";")) {
-				errors.add(new ValidationError(xmlFile, lineNum, -1,
-						path + " 요소의 값에 금칙어(<, >, \", ;)가 포함되어 있습니다."));
+				addError(xmlFile, lineNum, -1,
+						path + " 요소의 값에 금칙어(<, >, \", ;)가 포함되어 있습니다.");
 			}
 		}
 		
@@ -344,12 +889,12 @@ public class ConsistencyValidator {
 			try {
 				int num = Integer.parseInt(value);
 				if (num < 1 || num > 5) {
-					errors.add(new ValidationError(xmlFile, lineNum, -1,
-							path + " 요소의 값 '" + value + "'이(가) 1~5 범위를 벗어났습니다."));
+					addError(xmlFile, lineNum, -1,
+							path + " 요소의 값 '" + value + "'이(가) 1~5 범위를 벗어났습니다.");
 				}
 			} catch (NumberFormatException e) {
-				errors.add(new ValidationError(xmlFile, lineNum, -1,
-						path + " 요소의 값 '" + value + "'이(가) 숫자가 아닙니다."));
+				addError(xmlFile, lineNum, -1,
+						path + " 요소의 값 '" + value + "'이(가) 숫자가 아닙니다.");
 			}
 		}
 	}
@@ -363,8 +908,8 @@ public class ConsistencyValidator {
 		String codeValue = element.getAttribute("Code");
 		if (codeValue != null && !codeValue.isEmpty()) {
 			if (!allowedCodes.contains(codeValue)) {
-				errors.add(new ValidationError(xmlFile, lineNum, -1,
-						path + " 요소의 Code 속성 값 '" + codeValue + "'이(가) 허용된 코드가 아닙니다."));
+				addError(xmlFile, lineNum, -1,
+						path + " 요소의 Code 속성 값 '" + codeValue + "'이(가) 허용된 코드가 아닙니다.");
 			}
 		}
 	}
@@ -374,12 +919,32 @@ public class ConsistencyValidator {
 	 */
 	@SuppressWarnings("unchecked")
 	private void validateChildren(File xmlFile, Element parent, Map<String, Object> childrenRules, String parentPath) {
+		System.out.println("자식 요소 검증 시작: 부모 경로 = " + parentPath);
+		System.out.println("검증할 자식 요소 규칙: " + childrenRules.keySet());
+		
+		// 부모 요소의 모든 자식 요소 출력 (디버깅)
+		NodeList allChildren = parent.getChildNodes();
+		System.out.println("부모 요소 '" + parentPath + "'의 모든 자식 노드:");
+		for (int i = 0; i < allChildren.getLength(); i++) {
+			Node node = allChildren.item(i);
+			if (node instanceof Element) {
+				Element elem = (Element) node;
+				String nodeName = elem.getNodeName();
+				String localName = elem.getLocalName();
+				System.out.println("  자식 요소[" + i + "]: nodeName='" + nodeName + 
+						"', localName='" + localName + "'");
+			}
+		}
+		
 		for (Map.Entry<String, Object> entry : childrenRules.entrySet()) {
 			String childName = entry.getKey();
 			Map<String, Object> childRule = (Map<String, Object>) entry.getValue();
 			
+			System.out.println("자식 요소 '" + childName + "' 검증 시작");
+			
 			// 자식 요소 찾기
 			List<Element> childElements = getChildElements(parent, childName);
+			System.out.println("자식 요소 '" + childName + "' 발견 개수: " + childElements.size());
 			
 			// occurrence 검증
 			String occurrence = (String) childRule.get("occurrence");
@@ -389,7 +954,9 @@ public class ConsistencyValidator {
 			
 			// 각 자식 요소 검증
 			for (Element child : childElements) {
-				validateElement(xmlFile, child, childRule, parentPath + "/" + childName);
+				String childPath = parentPath + "/" + childName;
+				System.out.println("자식 요소 검증 실행: " + childPath);
+				validateElement(xmlFile, child, childRule, childPath);
 			}
 		}
 	}
@@ -419,23 +986,23 @@ public class ConsistencyValidator {
 		if (occurrence.equals("1")) {
 			// 정확히 1개
 			if (count == 0 && isRequired) {
-				errors.add(new ValidationError(xmlFile, lineNum, -1,
-						parentPath + " 요소에 필수 자식 요소 '" + elementName + "'이(가) 없습니다."));
+				addError(xmlFile, lineNum, -1,
+						parentPath + " 요소에 필수 자식 요소 '" + elementName + "'이(가) 없습니다.");
 			} else if (count > 1) {
-				errors.add(new ValidationError(xmlFile, lineNum, -1,
-						parentPath + " 요소에 '" + elementName + "' 요소가 1개만 있어야 하지만 " + count + "개가 있습니다."));
+				addError(xmlFile, lineNum, -1,
+						parentPath + " 요소에 '" + elementName + "' 요소가 1개만 있어야 하지만 " + count + "개가 있습니다.");
 			}
 		} else if (occurrence.equals("0..1")) {
 			// 0개 또는 1개
 			if (count > 1) {
-				errors.add(new ValidationError(xmlFile, lineNum, -1,
-						parentPath + " 요소에 '" + elementName + "' 요소가 최대 1개만 있어야 하지만 " + count + "개가 있습니다."));
+				addError(xmlFile, lineNum, -1,
+						parentPath + " 요소에 '" + elementName + "' 요소가 최대 1개만 있어야 하지만 " + count + "개가 있습니다.");
 			}
 		} else if (occurrence.equals("1..n")) {
 			// 1개 이상
 			if (count == 0) {
-				errors.add(new ValidationError(xmlFile, lineNum, -1,
-						parentPath + " 요소에 '" + elementName + "' 요소가 최소 1개 이상 있어야 합니다."));
+				addError(xmlFile, lineNum, -1,
+						parentPath + " 요소에 '" + elementName + "' 요소가 최소 1개 이상 있어야 합니다.");
 			}
 		} else if (occurrence.equals("0..n")) {
 			// 0개 이상 - 항상 유효
@@ -449,25 +1016,73 @@ public class ConsistencyValidator {
 		List<Element> children = new ArrayList<>();
 		NodeList nodeList = parent.getChildNodes();
 		
+		System.out.println("자식 요소 찾기: 찾을 이름 = '" + childName + "', 부모 = '" + parent.getNodeName() + "'");
+		
 		for (int i = 0; i < nodeList.getLength(); i++) {
 			Node node = nodeList.item(i);
 			if (node instanceof Element) {
 				Element elem = (Element) node;
+				String nodeName = elem.getNodeName();
 				String localName = elem.getLocalName();
 				if (localName == null) {
-					localName = elem.getNodeName();
+					localName = nodeName;
 				}
 				// 네임스페이스 프리픽스 제거
-				if (localName.contains(":")) {
-					localName = localName.substring(localName.indexOf(":") + 1);
+				String compareName = localName;
+				if (compareName.contains(":")) {
+					compareName = compareName.substring(compareName.indexOf(":") + 1);
 				}
-				if (localName.equals(childName)) {
+				
+				System.out.println("  자식 요소 비교: nodeName='" + nodeName + 
+						"', localName='" + localName + 
+						"', compareName='" + compareName + 
+						"', 찾는 이름='" + childName + 
+						"', 일치=" + compareName.equals(childName));
+				
+				if (compareName.equals(childName)) {
 					children.add(elem);
+					System.out.println("  -> 일치! 추가됨");
 				}
 			}
 		}
 		
+		System.out.println("자식 요소 찾기 완료: " + children.size() + "개 발견");
 		return children;
+	}
+	
+	/**
+	 * 문자열의 각 문자를 상세히 분석합니다 (디버깅용).
+	 */
+	private String getCharDetails(String str) {
+		if (str == null || str.isEmpty()) {
+			return "empty";
+		}
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < str.length(); i++) {
+			char c = str.charAt(i);
+			sb.append("[").append(i).append("]='").append(c).append("'");
+			sb.append("(U+").append(String.format("%04X", (int)c)).append(")");
+			if (i < str.length() - 1) {
+				sb.append(" ");
+			}
+		}
+		return sb.toString();
+	}
+	
+	/**
+	 * 오류를 추가합니다 (중복 체크 포함).
+	 */
+	private void addError(File xmlFile, int lineNum, int columnNum, String message) {
+		// 중복 오류 확인 - 같은 파일, 같은 라인, 같은 메시지인 경우 추가하지 않음
+		for (ValidationError error : errors) {
+			if (error.getFile().equals(xmlFile) && 
+				error.getLineNumber() == lineNum && 
+				error.getMessage().equals(message)) {
+				return; // 중복 오류는 추가하지 않음
+			}
+		}
+		errors.add(new ValidationError(xmlFile, lineNum, columnNum, message, 
+				ValidationError.ErrorType.CONSISTENCY));
 	}
 	
 	/**

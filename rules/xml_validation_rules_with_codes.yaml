@@ -15,27 +15,35 @@ rules:
         allowed_values:
         - BA
         - CA
-        description: '일반금융기관 : "BA", 카지노 : "CA"'
+        required: true
+        description: '일반금융기관 : "BA", 카지노 : "CA" (BA 또는 CA 중 하나만 허용)'
     children:
       Organization:
         description: 보고기관정보
         occurrence: '1'
         children:
           OrgName:
-            description: 보고기관명 보고기관코드*
+            description: 보고기관명 (요소 텍스트 값) / 보고기관코드* (Code 속성)
             occurrence: '1'
             required: required
-            data_type: '- 6'
+            note: 보고기관명은 요소의 텍스트 값으로 길이 제한이 없습니다. 보고기관코드는 Code 속성으로 정확히 6자여야 하며 필수입니다.
             attributes:
-              Code: ''
+              Code:
+                type: fixed_length
+                length: 6
+                required: required
+                description: 보고기관코드 (정확히 6자)
           MainAuthor:
-            description: 보고담당자명 보고자 아이디*
+            description: 보고담당자명 (요소 텍스트 값) / 보고자 아이디* (Userid 속성)
             occurrence: '1'
-            required: optional
-            data_type: 60 20
-            note: 보고자아이디가 없을경우 Optional 이며, 보고자성명은 필수 항목
+            required: required
+            data_type: '60'
+            note: 보고담당자명은 요소의 텍스트 값으로 최대 60자입니다. 보고자 아이디는 Userid 속성으로 최대 20자이며, 없을 경우 Optional입니다. 보고자성명은 필수 항목입니다.
             attributes:
-              Userid: ''
+              Userid:
+                type: max_length
+                length: 20
+                description: 보고자 아이디 (최대 20자)
           Manager:
             description: 보고책임자명
             occurrence: '1'
@@ -1155,12 +1163,16 @@ rules:
                 validation_rule_1: 통화종류가 KRW가 아니고  거래종류코드가 '99'(기타)가 아닐 경우 값은 1이상이어야 함
                 note: 'default값 : 0'
               OrgName:
-                description: 금융기관명 금융기관코드*
+                description: 금융기관명 (요소 텍스트 값) / 금융기관코드* (Code 속성)
                 occurrence: '1'
                 required: required
-                data_type: '- 6'
+                note: 금융기관명은 요소의 텍스트 값으로 길이 제한이 없습니다. 금융기관코드는 Code 속성으로 정확히 6자여야 하며 필수입니다.
                 attributes:
-                  Code: ''
+                  Code:
+                    type: fixed_length
+                    length: 6
+                    required: true
+                    description: 금융기관코드 (정확히 6자)
               BranchOffice:
                 description: 지점명 우편번호* 지점코드*
                 occurrence: 0..1
@@ -1205,12 +1217,16 @@ rules:
                 occurrence: 0..n
                 children:
                   OrgName:
-                    description: 금융기관명 금융기관코드*
+                    description: 금융기관명 (요소 텍스트 값) / 금융기관코드* (Code 속성)
                     occurrence: '1'
                     required: required
-                    data_type: '- 6'
+                    note: 금융기관명은 요소의 텍스트 값으로 길이 제한이 없습니다. 금융기관코드는 Code 속성으로 정확히 6자여야 하며 필수입니다.
                     attributes:
-                      Code: ''
+                      Code:
+                        type: fixed_length
+                        length: 6
+                        required: true
+                        description: 금융기관코드 (정확히 6자)
                   AccountNumber:
                     description: 계좌번호
                     occurrence: '1'
@@ -1449,10 +1465,11 @@ rules:
                 description: 업종코드명 업종코드*
                 occurrence: 0..1
                 required: required
-                data_type: '5'
-                note: 표준산업분류코드 참조
+                note: 표준산업분류코드 참조. Code 속성은 정확히 5자여야 하며, 텍스트 값은 길이 제한이 없습니다.
                 attributes:
-                  Code: ''
+                  Code:
+                    type: fixed_length
+                    length: 5
               BizAddress:
                 description: 사업체 사업장 우편번호/주소 우편번호* (법인/단체의 경우)
                 occurrence: 0..1
@@ -1510,13 +1527,16 @@ rules:
             occurrence: 0..n
             children:
               OrgName:
-                description: 금융기관명 금융기관코드*
+                description: 금융기관명 (요소 텍스트 값) / 금융기관코드* (Code 속성)
                 occurrence: '1'
                 required: required
-                data_type: '- 6'
-                note: 타행일 경우에 금융기관코드를 모른다면 코드를 'ZZZZZZ'를 입력
+                note: 금융기관명은 요소의 텍스트 값으로 길이 제한이 없습니다. 금융기관코드는 Code 속성으로 정확히 6자여야 하며 필수입니다. 타행일 경우에 금융기관코드를 모른다면 코드를 'ZZZZZZ'를 입력
                 attributes:
-                  Code: ''
+                  Code:
+                    type: fixed_length
+                    length: 6
+                    required: true
+                    description: 금융기관코드 (정확히 6자)
               BranchOffice:
                 description: 지점명 우편번호* 지점코드*
                 occurrence: 0..1
