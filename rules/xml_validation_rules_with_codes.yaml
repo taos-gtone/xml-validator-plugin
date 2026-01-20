@@ -1,12 +1,45 @@
+# ==============================================================================
+# STR XML 정합성 규칙 정의서 (Ver 5.6)
+# ==============================================================================
+# 참고 문서: STR_XML정의서_v5_6(250415).xlsx
+# - STR서식 Ver5.6 시트: 정합성 검증 기본 로직
+# - 보고기관코드집 시트: 보고기관코드 값 정의
+# - 혐의객관식질의코드 시트: 의심거래유형코드 값 정의
+#
+# 규칙 파일 구조 설명:
+# - description: 엑셀의 "일반STR설명" 컬럼 (최상단=element, 하위=attribute)
+# - occurrence: 엑셀의 "엘리먼트 카디날러티" 컬럼
+#   * '1': 정확히 1개 (필수)
+#   * '0..1': 0개 또는 1개 (선택)
+#   * '1..n': 1개 이상 (필수, 여러 개 가능)
+#   * '0..n': 0개 이상 (선택, 여러 개 가능)
+# - data_type: 엑셀의 "데이터타입" 컬럼
+#   * 숫자: 최대 길이 (예: '60' = 최대 60자)
+#   * 'numeric(정밀도,소수점)': 숫자 형식
+#   * 두 개의 값: 첫 번째=element 텍스트, 두 번째=attribute 값
+# - attributes: 엑셀의 "엘리먼트명" 컬럼에서 attribute로 정의된 항목
+# - code_reference: 코드 값이 정의된 시트 참조
+# ==============================================================================
+
 version: '5.6'
 description: STR XML 정합성 규칙 정의서
 encoding: EUC-KR
 rules:
+  # ========================================================================
+  # 루트 요소: STR
+  # ========================================================================
+  # 엑셀 시트: STR서식 Ver5.6
+  # 엘리먼트명: STR
+  # 일반STR설명: STR보고서 버전정보* 일반/카지노 구분*
+  #   - 최상단: STR보고서 (element)
+  #   - 하위: 버전정보* (Version 속성), 일반/카지노 구분* (Code 속성)
+  # 엘리먼트 카디날러티: 1 (정확히 1개, 필수)
+  # ========================================================================
   STR:
     description: STR보고서 버전정보* 일반/카지노 구분*
-    occurrence: '1'
+    occurrence: '1'  # 정확히 1개 필수
     required: fixed required
-    data_type: 3 2
+    data_type: 3 2  # Version 속성: 3자, Code 속성: 2자
     note: '일반금융기관 : "BA", 카지노 : "CA"'
     attributes:
       Version: '5.0'
@@ -19,9 +52,12 @@ rules:
         format: '^(BA|CA)$'
         description: '일반금융기관 : "BA", 카지노 : "CA" (BA 또는 CA 중 하나만 허용)'
     children:
+      # ====================================================================
+      # 보고기관정보 섹션
+      # ====================================================================
       Organization:
         description: 보고기관정보
-        occurrence: '1'
+        occurrence: '1'  # 정확히 1개 필수
         children:
           OrgName:
             description: 보고기관명 (요소 텍스트 값) / 보고기관코드* (Code 속성)
@@ -66,9 +102,12 @@ rules:
             description: 이메일
             occurrence: 0..1
             data_type: '30'
+      # ====================================================================
+      # STR 취합내용 + 의심정도 섹션
+      # ====================================================================
       Master:
         description: STR 취합내용 + 의심정도
-        occurrence: '1'
+        occurrence: '1'  # 정확히 1개 필수
         children:
           FiuDocNum:
             description: 보고번호
@@ -615,17 +654,21 @@ rules:
             required: required
             data_type: '8'
             format: YYYYMMDD
+          # 의심스러운 거래유형 및 정도에 관한 정보
+          # 엑셀 참고: 혐의객관식질의코드 시트의 코드 값 사용
           Suspicion:
             description: 의심스러운 거래유형 및 정도에 관한 정보
-            occurrence: 0..1
+            occurrence: 0..1  # 0개 또는 1개 (선택)
             children:
+              # 대항목명 대항목코드*
+              # 엑셀 참고: 혐의객관식질의코드 시트의 대항목 코드 (100, 200, 300, 400)
               QuestionTitle:
                 description: 대항목명 대항목코드*
-                occurrence: 1..n
+                occurrence: 1..n  # 1개 이상 필수 (여러 개 가능)
                 required: required
-                data_type: '- numeric(3)'
+                data_type: '- numeric(3)'  # element 텍스트는 없음, Code 속성은 3자리 숫자
                 format: 코드 체크
-                note: 혐의객관식질의코드 참조
+                note: 혐의객관식질의코드 참조 (보고기관코드집 시트의 대항목 코드 사용)
                 attributes:
                   Code:
                     type: enum
@@ -636,13 +679,15 @@ rules:
                     - '400'
                     code_reference: 의심거래유형코드
                 children:
+                  # 소항목명 소항목코드*
+                  # 엑셀 참고: 혐의객관식질의코드 시트의 소항목 코드 (101, 102, ...)
                   Question:
                     description: 소항목명 소항목코드*
-                    occurrence: 1..n
+                    occurrence: 1..n  # 1개 이상 필수 (여러 개 가능)
                     required: required
-                    data_type: '- numeric(3)'
+                    data_type: '- numeric(3)'  # element 텍스트는 없음, Code 속성은 3자리 숫자
                     format: 코드 체크
-                    note: 혐의객관식질의코드 참조 (3자리 코드)
+                    note: 혐의객관식질의코드 참조 (혐의객관식질의코드 시트의 소항목 코드 사용)
                     attributes:
                       Code:
                         type: enum
@@ -763,13 +808,18 @@ rules:
                 data_type: '3000'
                 format: 금칙어 체크(<,>,",;)
                 validation_rule_2: "의심스러운 거래유형(Suspicion)이 없을 경우 필수, Suspicion이 있을 경우 비어있어야 함"
+      # ====================================================================
+      # 상세내용 섹션
+      # ====================================================================
       Detail:
         description: 상세내용
-        occurrence: '1'
+        occurrence: '1'  # 정확히 1개 필수
         children:
+          # 거래내역
+          # 엑셀 참고: 각 거래는 별도의 Transaction 요소로 정의
           Transaction:
             description: 거래내역
-            occurrence: 1..n
+            occurrence: 1..n  # 1개 이상 필수 (여러 개 가능)
             children:
               Seq:
                 description: 거래일련번호
@@ -1126,23 +1176,29 @@ rules:
                   '33': 가상자산 입고
                   '34': 가상자산 출고
                   '99': 기타
+              # 거래상품명 거래상품코드*
+              # 엑셀 참고: 거래상품코드는 code_values 섹션의 "거래상품" 참조
+              # 주의: 카지노의 경우 게임상품 코드도 포함됨
               Goods:
                 description: 거래상품명 거래상품코드*
-                occurrence: '1'
+                occurrence: '1'  # 정확히 1개 필수
                 required: required
-                data_type: 50 3
+                data_type: 50 3  # element 텍스트: 최대 50자, Code 속성: 3자
                 format: 코드 체크
-                note: 거래상품코드 참조
+                note: 거래상품코드 참조 (code_values 섹션의 "거래상품" 참조)
                 attributes:
-                  Code: ''
+                  Code: ''  # TODO: 거래상품코드 enum 값 정의 필요 (엑셀의 거래상품 시트 참조)
+              # 통화명 통화종류코드*
+              # 엑셀 참고: 통화코드는 ISO 4217 표준 코드 사용
+              # 주의: 가상자산의 경우 통화코드는 "VAS"로 함 (code_values 섹션 참조)
               MoneyType:
                 description: 통화명 통화종류코드*
-                occurrence: '1'
+                occurrence: '1'  # 정확히 1개 필수
                 required: required
-                data_type: '- 3'
-                note: 통화코드참조
+                data_type: '- 3'  # element 텍스트는 없음, Code 속성: 3자
+                note: 통화코드참조 (ISO 4217 표준, 가상자산은 "VAS")
                 attributes:
-                  Code: ''
+                  Code: ''  # TODO: 통화코드 enum 값 정의 필요 (ISO 4217 표준 참조)
               KRWAmount:
                 description: 원화거래금액
                 occurrence: '1'
@@ -1174,20 +1230,25 @@ rules:
                     length: 6
                     required: true
                     description: 금융기관코드 (정확히 6자)
+              # 지점명 우편번호* 지점코드*
+              # 엑셀 참고: 지점코드는 은행연합회에 등록한 지점코드 사용
+              # 주의: 거래채널코드에 따라 필수 여부가 달라짐
               BranchOffice:
                 description: 지점명 우편번호* 지점코드*
-                occurrence: 0..1
-                required: required required
-                data_type: 50 6 7
+                occurrence: 0..1  # 0개 또는 1개 (선택, 단 validation_rule_2에 따라 필수일 수 있음)
+                required: required required  # 지점명과 지점코드는 필수 (occurrence가 0..1이지만 존재할 경우)
+                data_type: 50 6 7  # element 텍스트(지점명): 최대 50자, ZipCode 속성: 6자, Code 속성: 7자
                 format: 지점명 금칙어 체크(<,>,",;)
                 validation_rule_2: "거래채널코드가 '02','04','06' \n(자동화기기, 인터넷뱅킹, 콜센터)\n이외의 경우에 필수"
                 note: 'Code(지점코드) : 은행연합회에 등록한 지점코드'
                 attributes:
-                  ZipCode: ''
-                  Code: ''
+                  ZipCode: ''  # TODO: 우편번호 형식 검증 필요 (6자리 숫자)
+                  Code: ''  # TODO: 지점코드 enum 값 정의 필요 (은행연합회 등록 코드 참조)
+              # 거래에대한 거래자역할
+              # 엑셀 참고: 거래자역할코드는 code_values 섹션의 "거래역할" 참조
               UserRelation:
                 description: 거래에대한 거래자역할
-                occurrence: 1..n
+                occurrence: 1..n  # 1개 이상 필수 (여러 개 가능)
                 validation_rule_1: '<UserRelation>이 여러 번 반복될 때
 
                   거래역할코드가 중복되면 안됨'
@@ -1213,9 +1274,11 @@ rules:
                     description: 거래자역할 기타기재
                     occurrence: 0..1
                     data_type: '200'
+              # 거래에대한 계좌관계
+              # 엑셀 참고: 계좌역할코드는 code_values 섹션의 "계좌유형구분" 참조
               AccountRelation:
                 description: 거래에대한 계좌관계
-                occurrence: 0..n
+                occurrence: 0..n  # 0개 이상 (선택, 여러 개 가능)
                 children:
                   OrgName:
                     description: 금융기관명 (요소 텍스트 값) / 금융기관코드* (Code 속성)
@@ -1241,10 +1304,13 @@ rules:
                     format: 코드 체크
                     attributes:
                       Code: ''
+              # 관련계좌존재여부가 "부"일 경우
+              # 주의: 이 요소는 관련계좌가 존재하지 않을 때만 사용
+              # TODO: 엑셀 정의서에서 이 요소의 정확한 사용 조건 확인 필요
               NonAccountRelation:
                 description: 관련계좌존재여부가 "부"일 경우
-                occurrence: 0..1
-                data_type: '1'
+                occurrence: 0..1  # 0개 또는 1개 (선택)
+                data_type: '1'  # 1자 (예: 'Y' 또는 'N')
               Securities:
                 description: 유가증권
                 occurrence: 0..n
@@ -1349,9 +1415,13 @@ rules:
                 description: 보험
                 occurrence: 0..1
                 validation_rule_2: "거래상품코드가 \n'61'~'66'(보험)일 경우 필수"
+          # ====================================================================
+          # 거래자 정보 섹션
+          # ====================================================================
+          # 엑셀 참고: 거래자 정보는 거래와 별도로 정의됨
           User:
             description: 거래자
-            occurrence: 1..n
+            occurrence: 1..n  # 1개 이상 필수 (여러 개 가능)
             children:
               RealNumber:
                 description: 실명번호 실명번호구분코드*
@@ -1523,9 +1593,12 @@ rules:
               StockListInfo:
                 description: 상장정보 (법인/단체의 경우-상장정보)
                 occurrence: 0..1
+          # ====================================================================
+          # 계좌 정보 섹션
+          # ====================================================================
           Account:
             description: 계좌
-            occurrence: 0..n
+            occurrence: 0..n  # 0개 이상 (선택, 여러 개 가능)
             children:
               OrgName:
                 description: 금융기관명 (요소 텍스트 값) / 금융기관코드* (Code 속성)
@@ -1671,9 +1744,12 @@ rules:
                 format: 금칙어 체크(<,>,",;)
                 validation_rule_2: "거래자관계코드가 \n'52'대리인일 경우 필수"
                 note: 거래자와관계 코드명
+      # ====================================================================
+      # 첨부파일 섹션
+      # ====================================================================
       FileAttach:
         description: 첨부파일
-        occurrence: 0..n
+        occurrence: 0..n  # 0개 이상 (선택, 여러 개 가능)
         children:
           FileName:
             description: 첨부파일명 정형화된 파일여부*
@@ -1686,6 +1762,14 @@ rules:
           Body:
             description: 첨부파일(base64인코딩)
             occurrence: '1'
+# ==============================================================================
+# 코드 값 정의 섹션
+# ==============================================================================
+# 엑셀 참고:
+# - 보고기관코드집 시트: 보고기관코드 값 정의
+# - 혐의객관식질의코드 시트: 의심거래유형코드 값 정의
+# - 각 코드는 general(일반금융기관)과 card(카지노)로 구분될 수 있음
+# ==============================================================================
 code_values:
   메시지타입코드:
     '01':
@@ -1949,6 +2033,8 @@ code_values:
     '99':
       general: 기타
       card: 기타
+  # 주의: YAML 키에 특수문자(줄바꿈)가 포함되어 있어 '?'로 시작함
+  # 엑셀 참고: 거래상품코드는 일반금융기관과 카지노에서 다를 수 있음
   ? '거래상품
 
 
@@ -2182,6 +2268,8 @@ code_values:
       general: 상속
     '99':
       general: 기타(기재)
+  # 주의: YAML 키에 특수문자(줄바꿈)가 포함되어 있어 '?'로 시작함
+  # 엑셀 참고: 상장구분은 서식3면에 정의됨
   ? '상장구분
 
     서식3면'
@@ -2232,7 +2320,13 @@ code_values:
       general: 대기업
     '02':
       general: 중소기업
+  # 주의: YAML 키에 특수문자('*')가 포함되어 있어 문자열로 처리됨
   '* 참고 : 가상자산의 통화코드는 "VAS"로 함': {}
+  # ========================================================================
+  # 의심거래유형코드
+  # ========================================================================
+  # 엑셀 참고: 혐의객관식질의코드 시트의 대항목(100, 200, 300, 400)과 소항목 코드
+  # 구조: 대항목 코드 아래에 sub_codes로 소항목 코드가 정의됨
   의심거래유형코드:
     '100':
       description: 의심스러운 거래자의 태도 및 특징관련

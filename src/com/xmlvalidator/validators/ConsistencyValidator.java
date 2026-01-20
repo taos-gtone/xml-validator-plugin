@@ -31,7 +31,6 @@ public class ConsistencyValidator {
 	
 	private YamlRuleParser ruleParser;
 	private List<ValidationError> errors;
-	private String xmlEncoding;
 	private Map<String, Integer> elementLineNumbers;  // 요소별 라인 번호 저장
 	
 	public ConsistencyValidator(YamlRuleParser ruleParser) {
@@ -49,6 +48,13 @@ public class ConsistencyValidator {
 		errors.clear();
 		elementLineNumbers.clear();
 		
+		// ruleParser가 null인지 확인
+		if (ruleParser == null) {
+			System.err.println("규칙 파서가 초기화되지 않았습니다.");
+			addError(xmlFile, -1, -1, "규칙 파서가 초기화되지 않았습니다.");
+			return false;
+		}
+		
 		// 파일이 존재하는지 확인
 		if (!xmlFile.exists()) {
 			System.err.println("파일이 존재하지 않습니다: " + xmlFile.getAbsolutePath());
@@ -61,49 +67,6 @@ public class ConsistencyValidator {
 		long lastModified = xmlFile.lastModified();
 		System.out.println("정합성 검증 시작: " + xmlFile.getName());
 		System.out.println("파일 정보: 크기=" + fileSize + " bytes, 수정 시간=" + lastModified);
-		
-		// XML 파일에서 KSIC Code 속성 값을 직접 읽어서 확인 (디버깅용)
-		try {
-			String encoding = ruleParser.getEncoding();
-			if (encoding == null || encoding.isEmpty()) {
-				encoding = "UTF-8";
-			}
-			try (BufferedReader reader = new BufferedReader(
-					new InputStreamReader(new FileInputStream(xmlFile), encoding))) {
-				String line;
-				int lineNum = 0;
-				while ((line = reader.readLine()) != null) {
-					lineNum++;
-					// KSIC 요소와 Code 속성을 찾기
-					if (line.contains("KSIC") && line.contains("Code=")) {
-						System.out.println("========================================");
-						System.out.println("XML 파일 원시 라인 발견 (라인 " + lineNum + "):");
-						System.out.println("  원시 라인: " + line);
-						
-						// Code 속성 값 추출 (정규식 사용)
-						java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("Code\\s*=\\s*\"([^\"]+)\"");
-						java.util.regex.Matcher matcher = pattern.matcher(line);
-						if (matcher.find()) {
-							String rawCodeValue = matcher.group(1);
-							System.out.println("  추출된 Code 값: '" + rawCodeValue + "'");
-							System.out.println("  Code 값 문자 길이: " + rawCodeValue.length());
-							byte[] codeBytes = rawCodeValue.getBytes(encoding);
-							System.out.println("  Code 값 바이트 길이: " + codeBytes.length);
-							StringBuilder hex = new StringBuilder();
-							for (byte b : codeBytes) {
-								hex.append(String.format("%02X ", b));
-							}
-							System.out.println("  Code 값 바이트 (HEX): " + hex.toString().trim());
-							System.out.println("  Code 값 각 문자: " + getCharDetails(rawCodeValue));
-						}
-						System.out.println("========================================");
-					}
-				}
-			}
-		} catch (Exception e) {
-			System.err.println("XML 파일 원시 읽기 오류: " + e.getMessage());
-			e.printStackTrace();
-		}
 		
 		try {
 			// 인코딩 처리
@@ -148,61 +111,22 @@ public class ConsistencyValidator {
 			
 			System.out.println("루트 요소: " + root.getNodeName());
 			
-			// STR 규칙 가져오기
+			// 루트 요소 이름으로 규칙 가져오기 (STR이 아닌 다른 루트 요소도 지원)
+			String rootElementName = root.getLocalName();
+			if (rootElementName == null) {
+				rootElementName = root.getNodeName();
+				if (rootElementName.contains(":")) {
+					rootElementName = rootElementName.substring(rootElementName.indexOf(":") + 1);
+				}
+			}
+			
 			@SuppressWarnings("unchecked")
-			Map<String, Object> strRule = (Map<String, Object>) ruleParser.getRules().get("STR");
-			System.out.println("STR 규칙 존재 여부: " + (strRule != null));
-			if (strRule != null) {
-				System.out.println("STR 규칙 키: " + strRule.keySet());
-				
-				// STR 규칙의 attributes 확인
-				@SuppressWarnings("unchecked")
-				Map<String, Object> strAttributes = (Map<String, Object>) strRule.get("attributes");
-				System.out.println("STR attributes 규칙 존재 여부: " + (strAttributes != null));
-				if (strAttributes != null) {
-					System.out.println("STR attributes 규칙 키: " + strAttributes.keySet());
-					if (strAttributes.containsKey("Code")) {
-						@SuppressWarnings("unchecked")
-						Map<String, Object> codeRule = (Map<String, Object>) strAttributes.get("Code");
-						System.out.println("STR Code 속성 규칙: " + codeRule);
-						if (codeRule != null) {
-							System.out.println("STR Code 속성 규칙 타입: " + codeRule.get("type"));
-							System.out.println("STR Code 속성 허용값: " + codeRule.get("allowed_values"));
-						}
-					} else {
-						System.err.println("경고: STR attributes에 Code 규칙이 없습니다!");
-					}
-				} else {
-					System.err.println("경고: STR attributes 규칙이 없습니다!");
-				}
-				
-				// children 규칙 확인
-				Map<String, Object> children = (Map<String, Object>) strRule.get("children");
-				if (children != null) {
-					System.out.println("STR children 규칙: " + children.keySet());
-					// KSIC 규칙 확인
-					if (children.containsKey("KSIC")) {
-						Map<String, Object> ksicRule = (Map<String, Object>) children.get("KSIC");
-						System.out.println("KSIC 규칙 발견!");
-						System.out.println("KSIC 규칙 내용: " + ksicRule);
-						Map<String, Object> ksicAttrs = (Map<String, Object>) ksicRule.get("attributes");
-						if (ksicAttrs != null) {
-							System.out.println("KSIC attributes 규칙: " + ksicAttrs);
-							if (ksicAttrs.containsKey("Code")) {
-								Map<String, Object> codeRule = (Map<String, Object>) ksicAttrs.get("Code");
-								System.out.println("KSIC Code 속성 규칙: " + codeRule);
-							}
-						}
-					} else {
-						System.out.println("경고: STR children에 KSIC 규칙이 없습니다!");
-					}
-				} else {
-					System.out.println("경고: STR children 규칙이 없습니다!");
-				}
-				
-				validateElement(xmlFile, root, strRule, "STR");
+			Map<String, Object> rootRule = (Map<String, Object>) ruleParser.getRules().get(rootElementName);
+			if (rootRule != null) {
+				validateElement(xmlFile, root, rootRule, rootElementName);
 			} else {
-				System.out.println("경고: STR 규칙이 없습니다!");
+				System.err.println("경고: 루트 요소 '" + rootElementName + "'에 대한 규칙이 없습니다!");
+				addError(xmlFile, 1, -1, "루트 요소 '" + rootElementName + "'에 대한 규칙이 정의되지 않았습니다.");
 			}
 			
 			System.out.println("검증 완료. 오류 수: " + errors.size());
@@ -280,24 +204,66 @@ public class ConsistencyValidator {
 				}
 			}
 			
-			// 요소의 Code 속성 값으로 정확한 요소를 찾기
-			String codeValue = null;
-			if (element.hasAttribute("Code")) {
-				codeValue = element.getAttribute("Code");
+			// 요소의 고유 속성 값으로 정확한 요소를 찾기 (Code 속성뿐만 아니라 다른 속성도 지원)
+			// 규칙 파일에서 정의된 속성 중 첫 번째 속성을 사용하여 요소를 구분
+			String uniqueAttrValue = null;
+			String uniqueAttrName = null;
+			NamedNodeMap attrs = element.getAttributes();
+			if (attrs == null) {
+				// 속성이 없으면 요소 이름만으로 찾기
+				String searchElementName = path.contains("/") ? 
+						path.substring(path.lastIndexOf("/") + 1) : path;
+				Pattern pattern = Pattern.compile("<" + Pattern.quote(searchElementName) + "(?:\\s|>|/)");
+				while ((line = reader.readLine()) != null) {
+					lineNumber++;
+					Matcher matcher = pattern.matcher(line);
+					if (matcher.find()) {
+						return lineNumber;
+					}
+				}
+				return getLineNumber(elementName);
+			}
+			// Code 속성이 있으면 우선 사용, 없으면 첫 번째 속성 사용
+			for (int i = 0; i < attrs.getLength(); i++) {
+				Node attr = attrs.item(i);
+				String attrName = attr.getLocalName();
+				if (attrName == null) {
+					attrName = attr.getNodeName();
+					if (attrName.contains(":")) {
+						attrName = attrName.substring(attrName.indexOf(":") + 1);
+					}
+				}
+				if ("Code".equals(attrName)) {
+					uniqueAttrName = attrName;
+					uniqueAttrValue = attr.getNodeValue();
+					break;
+				}
+			}
+			// Code 속성이 없으면 첫 번째 속성 사용
+			if (uniqueAttrValue == null && attrs.getLength() > 0) {
+				Node firstAttr = attrs.item(0);
+				uniqueAttrName = firstAttr.getLocalName();
+				if (uniqueAttrName == null) {
+					uniqueAttrName = firstAttr.getNodeName();
+					if (uniqueAttrName.contains(":")) {
+						uniqueAttrName = uniqueAttrName.substring(uniqueAttrName.indexOf(":") + 1);
+					}
+				}
+				uniqueAttrValue = firstAttr.getNodeValue();
 			}
 			
 			// 경로에서 마지막 요소 이름 추출
 			String searchElementName = path.contains("/") ? 
 					path.substring(path.lastIndexOf("/") + 1) : path;
 			
-			// 정규식 패턴: 요소 이름과 Code 속성 (있는 경우)
+			// 정규식 패턴: 요소 이름과 고유 속성 (있는 경우)
 			String patternStr;
-			if (codeValue != null && !codeValue.isEmpty()) {
-				// Code 속성이 있는 경우: Code 속성 값으로 정확히 매칭
-				patternStr = "<" + Pattern.quote(searchElementName) + "\\s+Code\\s*=\\s*\"" + 
-						Pattern.quote(codeValue) + "\"";
+			if (uniqueAttrValue != null && !uniqueAttrValue.isEmpty() && uniqueAttrName != null) {
+				// 고유 속성이 있는 경우: 속성 값으로 정확히 매칭
+				patternStr = "<" + Pattern.quote(searchElementName) + "\\s+" + Pattern.quote(uniqueAttrName) + 
+						"\\s*=\\s*\"" + Pattern.quote(uniqueAttrValue) + "\"";
 			} else {
-				// Code 속성이 없는 경우: 요소 이름만으로 찾기
+				// 고유 속성이 없는 경우: 요소 이름만으로 찾기
 				patternStr = "<" + Pattern.quote(searchElementName) + "(?:\\s|>|/)";
 			}
 			
@@ -346,9 +312,9 @@ public class ConsistencyValidator {
 				
 				if (matcher.find()) {
 					matchCount++;
-					// Code 속성으로 매칭한 경우 정확히 일치
-					if (codeValue != null && !codeValue.isEmpty()) {
-						// Code 값이 일치하면 바로 반환
+					// 고유 속성으로 매칭한 경우 정확히 일치
+					if (uniqueAttrValue != null && !uniqueAttrValue.isEmpty()) {
+						// 고유 속성 값이 일치하면 바로 반환
 						return lineNumber;
 					} else if (targetMatch > 0 && matchCount == targetMatch) {
 						// 같은 이름의 요소 중 targetMatch 번째 요소
@@ -395,24 +361,65 @@ public class ConsistencyValidator {
 			}
 		}
 		
-		// 요소의 Code 속성 값으로 정확한 요소를 찾기
-		String codeValue = null;
-		if (element.hasAttribute("Code")) {
-			codeValue = element.getAttribute("Code");
+		// 요소의 고유 속성 값으로 정확한 요소를 찾기 (Code 속성뿐만 아니라 다른 속성도 지원)
+		String uniqueAttrValue = null;
+		String uniqueAttrName = null;
+		NamedNodeMap attrs = element.getAttributes();
+		if (attrs == null) {
+			// 속성이 없으면 요소 이름만으로 찾기
+			String searchElementName = path.contains("/") ? 
+					path.substring(path.lastIndexOf("/") + 1) : path;
+			Pattern pattern = Pattern.compile("<" + Pattern.quote(searchElementName) + "(?:\\s|>|/)");
+			while ((line = reader.readLine()) != null) {
+				lineNumber++;
+				Matcher matcher = pattern.matcher(line);
+				if (matcher.find()) {
+					return lineNumber;
+				}
+			}
+			return getLineNumber(elementName);
+		}
+		// Code 속성이 있으면 우선 사용, 없으면 첫 번째 속성 사용
+		for (int i = 0; i < attrs.getLength(); i++) {
+			Node attr = attrs.item(i);
+			String attrName = attr.getLocalName();
+			if (attrName == null) {
+				attrName = attr.getNodeName();
+				if (attrName.contains(":")) {
+					attrName = attrName.substring(attrName.indexOf(":") + 1);
+				}
+			}
+			if ("Code".equals(attrName)) {
+				uniqueAttrName = attrName;
+				uniqueAttrValue = attr.getNodeValue();
+				break;
+			}
+		}
+		// Code 속성이 없으면 첫 번째 속성 사용
+		if (uniqueAttrValue == null && attrs.getLength() > 0) {
+			Node firstAttr = attrs.item(0);
+			uniqueAttrName = firstAttr.getLocalName();
+			if (uniqueAttrName == null) {
+				uniqueAttrName = firstAttr.getNodeName();
+				if (uniqueAttrName.contains(":")) {
+					uniqueAttrName = uniqueAttrName.substring(uniqueAttrName.indexOf(":") + 1);
+				}
+			}
+			uniqueAttrValue = firstAttr.getNodeValue();
 		}
 		
 		// 경로에서 마지막 요소 이름 추출
 		String searchElementName = path.contains("/") ? 
 				path.substring(path.lastIndexOf("/") + 1) : path;
 		
-		// 정규식 패턴: 요소 이름과 Code 속성 (있는 경우)
+		// 정규식 패턴: 요소 이름과 고유 속성 (있는 경우)
 		String patternStr;
-		if (codeValue != null && !codeValue.isEmpty()) {
-			// Code 속성이 있는 경우: Code 속성 값으로 정확히 매칭
-			patternStr = "<" + Pattern.quote(searchElementName) + "\\s+Code\\s*=\\s*\"" + 
-					Pattern.quote(codeValue) + "\"";
+		if (uniqueAttrValue != null && !uniqueAttrValue.isEmpty() && uniqueAttrName != null) {
+			// 고유 속성이 있는 경우: 속성 값으로 정확히 매칭
+			patternStr = "<" + Pattern.quote(searchElementName) + "\\s+" + Pattern.quote(uniqueAttrName) + 
+					"\\s*=\\s*\"" + Pattern.quote(uniqueAttrValue) + "\"";
 		} else {
-			// Code 속성이 없는 경우: 요소 이름만으로 찾기
+			// 고유 속성이 없는 경우: 요소 이름만으로 찾기
 			patternStr = "<" + Pattern.quote(searchElementName) + "(?:\\s|>|/)";
 		}
 		
@@ -424,9 +431,9 @@ public class ConsistencyValidator {
 			Matcher matcher = pattern.matcher(line);
 			
 			if (matcher.find()) {
-				// Code 속성으로 매칭한 경우 정확히 일치
-				if (codeValue != null && !codeValue.isEmpty()) {
-					// Code 값이 일치하면 바로 반환
+				// 고유 속성으로 매칭한 경우 정확히 일치
+				if (uniqueAttrValue != null && !uniqueAttrValue.isEmpty()) {
+					// 고유 속성 값이 일치하면 바로 반환
 					return lineNumber;
 				} else {
 					// 첫 번째 매칭
@@ -622,63 +629,13 @@ public class ConsistencyValidator {
 						"', value='" + attr.getNodeValue() + "'");
 			}
 			
-			// STR 요소의 Code 속성 특별 체크 및 강제 검증
-			if ("STR".equals(path)) {
-				System.out.println(">>> STR 요소 검증 중 - Code 속성 특별 체크");
-				boolean hasCodeAttr = false;
-				String codeValue = null;
-				for (int i = 0; i < allAttrs.getLength(); i++) {
-					Node attr = allAttrs.item(i);
-					String attrName = attr.getLocalName();
-					if (attrName == null) {
-						attrName = attr.getNodeName();
-						if (attrName.contains(":")) {
-							attrName = attrName.substring(attrName.indexOf(":") + 1);
-						}
-					}
-					if ("Code".equals(attrName)) {
-						hasCodeAttr = true;
-						codeValue = attr.getNodeValue();
-						System.out.println(">>> STR Code 속성 발견! 값: '" + codeValue + "'");
-						System.out.println(">>> Code 속성 규칙 존재 여부: " + attributes.containsKey("Code"));
-						
-						// STR Code 속성 강제 검증: BA 또는 CA만 허용
-						if (codeValue != null && !codeValue.isEmpty()) {
-							codeValue = codeValue.trim();
-							if (!"BA".equals(codeValue) && !"CA".equals(codeValue)) {
-								int lineNum = findElementLineNumber(xmlFile, element, path, 
-										ruleParser != null ? ruleParser.getEncoding() : "UTF-8");
-								String errorMessage = "STR 요소의 Code 속성 값 '" + codeValue + 
-										"'이(가) 허용된 값이 아닙니다. 허용값: [BA, CA]";
-								System.err.println(">>> STR Code 속성 강제 검증 오류: " + errorMessage);
-								addError(xmlFile, lineNum, -1, errorMessage);
-							} else {
-								System.out.println(">>> STR Code 속성 강제 검증 통과: '" + codeValue + "'");
-							}
-						} else {
-							int lineNum = findElementLineNumber(xmlFile, element, path, 
-									ruleParser != null ? ruleParser.getEncoding() : "UTF-8");
-							String errorMessage = "STR 요소의 Code 속성은 필수입니다.";
-							System.err.println(">>> STR Code 속성 강제 검증 오류: " + errorMessage);
-							addError(xmlFile, lineNum, -1, errorMessage);
-						}
-						break;
-					}
-				}
-				if (!hasCodeAttr) {
-					// Code 속성이 없으면 enum 검증에서 처리하므로 여기서는 로그만 출력
-					System.err.println(">>> 경고: STR 요소에 Code 속성이 없습니다.");
-				}
-			}
-			
+			// 규칙 파일의 attributes 규칙에 따라 검증 (특정 element/attribute에 특화된 로직 없음)
 			validateAttributes(xmlFile, element, attributes, path);
 		} else {
 			System.out.println("속성 검증 규칙 없음");
 		}
 		
-		// 2. 필수 여부 검증
-		String required = (String) rule.get("required");
-		String occurrence = (String) rule.get("occurrence");
+		// 2. 필수 여부 및 occurrence 검증은 validateChildren에서 처리
 		
 		// 3. 데이터 타입 검증
 		String dataType = (String) rule.get("data_type");
