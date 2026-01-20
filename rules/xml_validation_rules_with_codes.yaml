@@ -860,7 +860,7 @@ rules:
                 attributes:
                   Code:
                     type: fixed_length
-                    length: 3
+                    length: 2
                     required: true
                     description: 거래채널코드 (정확히 3자)
                     type: enum
@@ -962,7 +962,7 @@ rules:
                 attributes:
                   Code:
                     type: fixed_length
-                    length: 3
+                    length: 2
                     required: true
                     description: 거래수단코드 (정확히 3자)
                     type: enum
@@ -1039,7 +1039,7 @@ rules:
                 attributes:
                   Code:
                     type: fixed_length
-                    length: 3
+                    length: 2
                     required: true
                     description: 거래종류코드 (정확히 3자)
                     type: enum
@@ -1206,7 +1206,7 @@ rules:
                 attributes:
                   Code:
                     type: fixed_length
-                    length: 3
+                    length: 2
                     required: true
                     description: 거래상품코드 (정확히 3자)
                     # TODO: 거래상품코드 enum 값 정의 필요 (엑셀의 거래상품 시트 참조)
