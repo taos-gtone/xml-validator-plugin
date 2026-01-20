@@ -39,10 +39,13 @@ rules:
     description: STR보고서 버전정보* 일반/카지노 구분*
     occurrence: '1'  # 정확히 1개 필수
     required: fixed required
-    data_type: 3 2  # Version 속성: 3자, Code 속성: 2자
+    # data_type: 3 2  # Version 속성: 3자, Code 속성: 2자 (이미 attributes에 정의됨)
     note: '일반금융기관 : "BA", 카지노 : "CA"'
     attributes:
-      Version: '5.0'
+      Version:
+        type: max_length
+        length: 3
+        description: 버전정보 (최대 3자)
       Code:
         type: enum
         allowed_values:
@@ -95,9 +98,13 @@ rules:
             description: 주소 우편번호*
             occurrence: '1'
             required: required
-            data_type: 200 6
+            data_type: '200'  # 주소 (요소 텍스트 값, 최대 200자)
+            note: 주소는 요소의 텍스트 값으로 최대 200자입니다. 우편번호는 ZipCode 속성으로 정확히 6자여야 합니다.
             attributes:
-              ZipCode: ''
+              ZipCode:
+                type: fixed_length
+                length: 6
+                description: 우편번호 (정확히 6자)
           Email:
             description: 이메일
             occurrence: 0..1
@@ -847,11 +854,15 @@ rules:
                 description: 거래채널명 거래채널코드*
                 occurrence: '1'
                 required: required
-                data_type: 50 3
+                data_type: '50'  # 거래채널명 (요소 텍스트 값, 최대 50자)
                 format: 코드 체크
-                note: 거래채널코드 참조
+                note: 거래채널명은 요소의 텍스트 값으로 최대 50자입니다. 거래채널코드는 Code 속성으로 3자여야 합니다.
                 attributes:
                   Code:
+                    type: fixed_length
+                    length: 3
+                    required: true
+                    description: 거래채널코드 (정확히 3자)
                     type: enum
                     allowed_values:
                     - '01'
@@ -945,13 +956,15 @@ rules:
                 description: 거래수단명 거래수단코드*
                 occurrence: '1'
                 required: required
-                data_type: 50 3
+                data_type: '50'  # 거래수단명 (요소 텍스트 값, 최대 50자, 실제로는 최대 16자리)
                 format: 코드 체크
-                note: '거래수단명 최대 16자리
-
-                  거래수단코드 참조'
+                note: '거래수단명은 요소의 텍스트 값으로 최대 16자리입니다. 거래수단코드는 Code 속성으로 3자여야 합니다.'
                 attributes:
                   Code:
+                    type: fixed_length
+                    length: 3
+                    required: true
+                    description: 거래수단코드 (정확히 3자)
                     type: enum
                     allowed_values:
                     - '01'
@@ -1019,12 +1032,16 @@ rules:
                 description: 거래종류명 거래종류코드*
                 occurrence: '1'
                 required: required
-                data_type: 50 3
+                data_type: '50'  # 거래종류명 (요소 텍스트 값, 최대 50자)
                 format: 코드 체크
                 validation_rule_1: 거래종류코드가 '31'(가상자산 매도), '32'(가상자산 매수)인 경우 계좌 정보(<AccountRelation>, <Account>)는 필수여야 함
-                note: 거래종류코드 참조
+                note: 거래종류명은 요소의 텍스트 값으로 최대 50자입니다. 거래종류코드는 Code 속성으로 3자여야 합니다.
                 attributes:
                   Code:
+                    type: fixed_length
+                    length: 3
+                    required: true
+                    description: 거래종류코드 (정확히 3자)
                     type: enum
                     allowed_values:
                     - '01'
@@ -1183,11 +1200,16 @@ rules:
                 description: 거래상품명 거래상품코드*
                 occurrence: '1'  # 정확히 1개 필수
                 required: required
-                data_type: 50 3  # element 텍스트: 최대 50자, Code 속성: 3자
+                data_type: '50'  # 거래상품명 (요소 텍스트 값, 최대 50자)
                 format: 코드 체크
-                note: 거래상품코드 참조 (code_values 섹션의 "거래상품" 참조)
+                note: 거래상품명은 요소의 텍스트 값으로 최대 50자입니다. 거래상품코드는 Code 속성으로 3자여야 합니다. (code_values 섹션의 "거래상품" 참조)
                 attributes:
-                  Code: ''  # TODO: 거래상품코드 enum 값 정의 필요 (엑셀의 거래상품 시트 참조)
+                  Code:
+                    type: fixed_length
+                    length: 3
+                    required: true
+                    description: 거래상품코드 (정확히 3자)
+                    # TODO: 거래상품코드 enum 값 정의 필요 (엑셀의 거래상품 시트 참조)
               # 통화명 통화종류코드*
               # 엑셀 참고: 통화코드는 ISO 4217 표준 코드 사용
               # 주의: 가상자산의 경우 통화코드는 "VAS"로 함 (code_values 섹션 참조)
@@ -1237,13 +1259,22 @@ rules:
                 description: 지점명 우편번호* 지점코드*
                 occurrence: 0..1  # 0개 또는 1개 (선택, 단 validation_rule_2에 따라 필수일 수 있음)
                 required: required required  # 지점명과 지점코드는 필수 (occurrence가 0..1이지만 존재할 경우)
-                data_type: 50 6 7  # element 텍스트(지점명): 최대 50자, ZipCode 속성: 6자, Code 속성: 7자
+                data_type: '50'  # 지점명 (요소 텍스트 값, 최대 50자)
                 format: 지점명 금칙어 체크(<,>,",;)
                 validation_rule_2: "거래채널코드가 '02','04','06' \n(자동화기기, 인터넷뱅킹, 콜센터)\n이외의 경우에 필수"
-                note: 'Code(지점코드) : 은행연합회에 등록한 지점코드'
+                note: '지점명은 요소의 텍스트 값으로 최대 50자입니다. 우편번호는 ZipCode 속성으로 6자, 지점코드는 Code 속성으로 7자여야 합니다. Code(지점코드) : 은행연합회에 등록한 지점코드'
                 attributes:
-                  ZipCode: ''  # TODO: 우편번호 형식 검증 필요 (6자리 숫자)
-                  Code: ''  # TODO: 지점코드 enum 값 정의 필요 (은행연합회 등록 코드 참조)
+                  ZipCode:
+                    type: fixed_length
+                    length: 6
+                    description: 우편번호 (정확히 6자)
+                    # TODO: 우편번호 형식 검증 필요 (6자리 숫자)
+                  Code:
+                    type: fixed_length
+                    length: 7
+                    required: true
+                    description: 지점코드 (정확히 7자, 은행연합회에 등록한 지점코드)
+                    # TODO: 지점코드 enum 값 정의 필요 (은행연합회 등록 코드 참조)
               # 거래에대한 거래자역할
               # 엑셀 참고: 거래자역할코드는 code_values 섹션의 "거래역할" 참조
               UserRelation:
@@ -1266,10 +1297,15 @@ rules:
                     description: 실명번호 실명번호구분코드*
                     occurrence: '1'
                     required: required
-                    data_type: 20 2
+                    data_type: '20'  # 실명번호 (요소 텍스트 값, 최대 20자)
                     format: 코드 체크
+                    note: 실명번호는 요소의 텍스트 값으로 최대 20자입니다. 실명번호구분코드는 Code 속성으로 2자여야 합니다.
                     attributes:
-                      Code: ''
+                      Code:
+                        type: fixed_length
+                        length: 2
+                        required: true
+                        description: 실명번호구분코드 (정확히 2자)
                   InsuRelDesc:
                     description: 거래자역할 기타기재
                     occurrence: 0..1
@@ -1427,13 +1463,18 @@ rules:
                 description: 실명번호 실명번호구분코드*
                 occurrence: '1'
                 required: required
-                data_type: 20 2
+                data_type: '20'  # 실명번호 (요소 텍스트 값, 최대 20자)
                 format: 코드 체크
                 validation_rule_1: '1. 실명번호구분코드가 ''01'',''02'',''03''일 경우 실명번호 Digit 체크
 
                   2. 실명번호구분코드가 ''08''인 경우 최대 20자리, 아닌 경우 최대 15자리까지 허용'
+                note: 실명번호는 요소의 텍스트 값으로 최대 20자입니다. 실명번호구분코드는 Code 속성으로 2자여야 합니다.
                 attributes:
-                  Code: ''
+                  Code:
+                    type: fixed_length
+                    length: 2
+                    required: true
+                    description: 실명번호구분코드 (정확히 2자)
               CINumber:
                 description: CI 번호
                 occurrence: 0..1
@@ -1463,26 +1504,38 @@ rules:
                 description: 거래자전화번호 핸드폰번호* (법인/단체의 경우, "사업체 전화번호-본점"에 해당)
                 occurrence: 0..1
                 required: optional
-                data_type: 25 25
+                data_type: '25'  # 거래자전화번호 (요소 텍스트 값, 최대 25자)
+                note: 거래자전화번호는 요소의 텍스트 값으로 최대 25자입니다. 핸드폰번호는 HandPhone 속성으로 최대 25자입니다.
                 attributes:
-                  HandPhone: ' '
+                  HandPhone:
+                    type: max_length
+                    length: 25
+                    description: 핸드폰번호 (최대 25자)
               Address:
                 description: 주소(자택) 우편번호* (법인/단체의 경우, "사업체 우편번호/주소-본점"에 해당)
                 occurrence: 0..1
                 required: required
-                data_type: 200 6
+                data_type: '200'  # 주소(자택) (요소 텍스트 값, 최대 200자)
                 validation_rule_2: '1. <UserRelation>의 거래자역할이 ''01'',''08'', ''11''일 경우
 
                   자택 또는 직장주소 중 최소 1가지 기재'
+                note: 주소(자택)는 요소의 텍스트 값으로 최대 200자입니다. 우편번호는 ZipCode 속성으로 정확히 6자여야 합니다.
                 attributes:
-                  ZipCode: ''
+                  ZipCode:
+                    type: fixed_length
+                    length: 6
+                    description: 우편번호 (정확히 6자)
               AddressCompany:
                 description: 주소(직장) 우편번호*
                 occurrence: 0..1
                 required: required
-                data_type: 200 6
+                data_type: '200'  # 주소(직장) (요소 텍스트 값, 최대 200자)
+                note: 주소(직장)는 요소의 텍스트 값으로 최대 200자입니다. 우편번호는 ZipCode 속성으로 정확히 6자여야 합니다.
                 attributes:
-                  ZipCode: ''
+                  ZipCode:
+                    type: fixed_length
+                    length: 6
+                    description: 우편번호 (정확히 6자)
                   Code: ''
               BirthDay:
                 description: 거래자 생년월일/사업체 설립일
@@ -1545,9 +1598,13 @@ rules:
                 description: 사업체 사업장 우편번호/주소 우편번호* (법인/단체의 경우)
                 occurrence: 0..1
                 required: required
-                data_type: 200 6
+                data_type: '200'  # 사업체 사업장 주소 (요소 텍스트 값, 최대 200자)
+                note: 사업체 사업장 주소는 요소의 텍스트 값으로 최대 200자입니다. 우편번호는 ZipCode 속성으로 정확히 6자여야 합니다.
                 attributes:
-                  ZipCode: ''
+                  ZipCode:
+                    type: fixed_length
+                    length: 6
+                    description: 우편번호 (정확히 6자)
                   Code: ''
               BizTelNo:
                 description: 사업체 사업장 전화번호 (법인/단체의 경우)
@@ -1615,12 +1672,19 @@ rules:
                 description: 지점명 우편번호* 지점코드*
                 occurrence: 0..1
                 required: required
-                data_type: 30 6 7
+                data_type: '30'  # 지점명 (요소 텍스트 값, 최대 30자)
                 validation_rule_2: 자행인 경우 필수
-                note: 'Code(지점코드) : 은행연합회에 등록한 지점코드'
+                note: '지점명은 요소의 텍스트 값으로 최대 30자입니다. 우편번호는 ZipCode 속성으로 6자, 지점코드는 Code 속성으로 7자여야 합니다. Code(지점코드) : 은행연합회에 등록한 지점코드'
                 attributes:
-                  ZipCode: ''
-                  Code: ''
+                  ZipCode:
+                    type: fixed_length
+                    length: 6
+                    description: 우편번호 (정확히 6자)
+                  Code:
+                    type: fixed_length
+                    length: 7
+                    required: true
+                    description: 지점코드 (정확히 7자, 은행연합회에 등록한 지점코드)
               AccountNumber:
                 description: 계좌번호
                 occurrence: '1'
@@ -1645,13 +1709,18 @@ rules:
                 description: 계좌주실명번호 실명번호구분코드*
                 occurrence: '1'
                 required: required
-                data_type: 20 2
+                data_type: '20'  # 계좌주실명번호 (요소 텍스트 값, 최대 20자)
                 format: 코드 체크
                 validation_rule_1: '1. 실명번호구분코드가 ''01'',''02'',''03''일 경우 실명번호 Digit 체크
 
                   2. 실명번호구분코드가 ''08''인 경우 최대 20자리, 아닌 경우 최대 15자리까지 허용'
+                note: 계좌주실명번호는 요소의 텍스트 값으로 최대 20자입니다. 실명번호구분코드는 Code 속성으로 2자여야 합니다.
                 attributes:
-                  Code: ' '
+                  Code:
+                    type: fixed_length
+                    length: 2
+                    required: true
+                    description: 실명번호구분코드 (정확히 2자)
               AccountUserCINumber:
                 description: 계좌주 CI 번호
                 occurrence: 0..1
@@ -1668,13 +1737,18 @@ rules:
                 description: 대리인실명번호 실명번호구분코드*
                 occurrence: 0..1
                 required: required
-                data_type: 20 2
+                data_type: '20'  # 대리인실명번호 (요소 텍스트 값, 최대 20자)
                 format: 코드 체크
                 validation_rule_1: '1. 실명번호구분코드가 ''01'',''02'',''03''일 경우 실명번호 Digit 체크
 
                   2. 실명번호구분코드가 ''08''인 경우 최대 20자리, 아닌 경우 최대 15자리까지 허용'
+                note: 대리인실명번호는 요소의 텍스트 값으로 최대 20자입니다. 실명번호구분코드는 Code 속성으로 2자여야 합니다.
                 attributes:
-                  Code: '  '
+                  Code:
+                    type: fixed_length
+                    length: 2
+                    required: true
+                    description: 실명번호구분코드 (정확히 2자)
               AgentUserCINumber:
                 description: 대리인 CI 번호
                 occurrence: 0..1
@@ -1685,10 +1759,15 @@ rules:
                 description: 계좌개설목적 계좌개설목적코드*
                 occurrence: 0..1
                 required: required
-                data_type: 100 2
+                data_type: '100'  # 계좌개설목적 (요소 텍스트 값, 최대 100자)
                 format: 코드 체크
+                note: 계좌개설목적은 요소의 텍스트 값으로 최대 100자입니다. 계좌개설목적코드는 Code 속성으로 2자여야 합니다.
                 attributes:
-                  Code: ' '
+                  Code:
+                    type: fixed_length
+                    length: 2
+                    required: true
+                    description: 계좌개설목적코드 (정확히 2자)
           InterUserRelation:
             description: User간의관계 (대표자,대리인 관계)
             occurrence: 0..n
@@ -1707,13 +1786,18 @@ rules:
                 description: 거래자, 계좌주, 송/수취계좌주,법인/단체 실명번호구분코드*
                 occurrence: '1'
                 required: required
-                data_type: 20 2
+                data_type: '20'  # 실명번호 (요소 텍스트 값, 최대 20자)
                 format: 코드 체크
                 validation_rule_1: '1. 실명번호구분코드가 ''01'',''02'',''03''일 경우 실명번호 Digit 체크
 
                   2. 실명번호구분코드가 ''08''인 경우 최대 20자리, 아닌 경우 최대 15자리까지 허용'
+                note: 실명번호는 요소의 텍스트 값으로 최대 20자입니다. 실명번호구분코드는 Code 속성으로 2자여야 합니다.
                 attributes:
-                  Code: ' '
+                  Code:
+                    type: fixed_length
+                    length: 2
+                    required: true
+                    description: 실명번호구분코드 (정확히 2자)
               PrincipalUserCINumber:
                 description: 거래자, 계좌주, 송/수취계좌주,법인/단체 CI 번호
                 occurrence: 0..1
@@ -1724,13 +1808,18 @@ rules:
                 description: 관계인 실명번호구분코드*
                 occurrence: '1'
                 required: required
-                data_type: 20 2
+                data_type: '20'  # 관계인 실명번호 (요소 텍스트 값, 최대 20자)
                 format: 코드 체크
                 validation_rule_1: '1. 실명번호구분코드가 ''01'',''02'',''03''일 경우 실명번호 Digit 체크
 
                   2. 실명번호구분코드가 ''08''인 경우 최대 20자리, 아닌 경우 최대 15자리까지 허용'
+                note: 관계인 실명번호는 요소의 텍스트 값으로 최대 20자입니다. 실명번호구분코드는 Code 속성으로 2자여야 합니다.
                 attributes:
-                  Code: ' '
+                  Code:
+                    type: fixed_length
+                    length: 2
+                    required: true
+                    description: 실명번호구분코드 (정확히 2자)
               ParticipantUserCINumber:
                 description: 관계인 CI 번호
                 occurrence: 0..1
