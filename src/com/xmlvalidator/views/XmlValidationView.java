@@ -15,6 +15,11 @@ import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.TableViewer;
 import org.eclipse.jface.viewers.TableViewerColumn;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.dnd.Clipboard;
+import org.eclipse.swt.dnd.TextTransfer;
+import org.eclipse.swt.dnd.Transfer;
+import org.eclipse.swt.events.KeyAdapter;
+import org.eclipse.swt.events.KeyEvent;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.TraverseEvent;
@@ -101,6 +106,7 @@ public class XmlValidationView extends ViewPart {
 	// 검증 시작 시간 및 진행 상태
 	private long validationStartTime = 0;
 	private int currentProgress = 0;
+	private String currentFileName = "";
 	
 	@Override
 	public void createPartControl(Composite parent) {
@@ -284,8 +290,20 @@ public class XmlValidationView extends ViewPart {
 		createColumns();
 		
 		tableViewer.setContentProvider(new ArrayContentProvider());
-		tableViewer.getTable().setHeaderVisible(true);
-		tableViewer.getTable().setLinesVisible(true);
+		org.eclipse.swt.widgets.Table table = tableViewer.getTable();
+		table.setHeaderVisible(true);
+		table.setLinesVisible(true);
+		
+		// 텍스트 선택 및 복사 기능 추가
+		table.addKeyListener(new KeyAdapter() {
+			@Override
+			public void keyPressed(KeyEvent e) {
+				// Ctrl+C 또는 Ctrl+Insert로 복사
+				if ((e.stateMask & SWT.CTRL) != 0 && (e.keyCode == 'c' || e.keyCode == 'C' || e.keyCode == SWT.INSERT)) {
+					copySelectedTableText();
+				}
+			}
+		});
 		
 		// 더블클릭 시 파일 열기
 		tableViewer.addDoubleClickListener(new IDoubleClickListener() {
@@ -1080,6 +1098,7 @@ public class XmlValidationView extends ViewPart {
 		// 검증 시작 시간 기록 및 플래그 초기화
 		validationStartTime = System.currentTimeMillis();
 		currentProgress = 0;
+		currentFileName = "";
 		validationCompleted = false;
 		
 		// Progress Bar 초기화 및 표시
@@ -1104,7 +1123,8 @@ public class XmlValidationView extends ViewPart {
 				if (!statusLabel.isDisposed() && !progressBar.isDisposed()) {
 					long elapsedTime = System.currentTimeMillis() - validationStartTime;
 					String timeString = formatElapsedTime(elapsedTime);
-					statusLabel.setText("검증 중... (" + currentProgress + "/" + selectedXmlFiles.size() + ") [" + timeString + "]");
+					String fileNameDisplay = currentFileName.isEmpty() ? "" : currentFileName + " ";
+					statusLabel.setText(fileNameDisplay + "검증 중... (" + currentProgress + "/" + selectedXmlFiles.size() + ") [" + timeString + "]");
 					
 					// 다음 타이머 예약 (검증이 진행 중인 경우에만)
 					if (!validationCancelled && !validationCompleted) {
@@ -1147,6 +1167,9 @@ public class XmlValidationView extends ViewPart {
 			
 			// 항상 최신 파일 객체를 생성하여 사용 (캐시 문제 방지)
 			File xmlFile = new File(filePath);
+			
+			// 현재 검증 중인 파일 이름 업데이트
+			currentFileName = xmlFile.getName();
 			
 			// 파일이 존재하는지 확인
 			if (!xmlFile.exists()) {
@@ -1309,6 +1332,7 @@ public class XmlValidationView extends ViewPart {
 			
 			display.asyncExec(() -> {
 				// 타이머는 validationCompleted 플래그로 자동 중단됨
+				currentFileName = ""; // 검증 완료 시 파일 이름 초기화
 				if (!progressBar.isDisposed()) {
 					progressBar.setVisible(false);
 				}
@@ -1378,6 +1402,40 @@ public class XmlValidationView extends ViewPart {
 		allValidationErrors.clear();
 		tableViewer.setInput(allValidationErrors);
 		statusLabel.setText("모든 오류 메시지가 삭제되었습니다.");
+	}
+	
+	/**
+	 * 선택된 테이블 행의 파일명과 오류 메시지를 클립보드에 복사합니다.
+	 */
+	private void copySelectedTableText() {
+		org.eclipse.swt.widgets.Table table = tableViewer.getTable();
+		int[] selectionIndices = table.getSelectionIndices();
+		
+		if (selectionIndices.length == 0) {
+			return;
+		}
+		
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < selectionIndices.length; i++) {
+			int index = selectionIndices[i];
+			Object element = tableViewer.getElementAt(index);
+			if (element instanceof ValidationError) {
+				ValidationError error = (ValidationError) element;
+				String fileName = error.getFile().getName();
+				String message = error.getMessage();
+				sb.append(fileName).append("\t").append(message);
+				if (i < selectionIndices.length - 1) {
+					sb.append(System.lineSeparator());
+				}
+			}
+		}
+		
+		if (sb.length() > 0) {
+			Clipboard clipboard = new Clipboard(Display.getCurrent());
+			TextTransfer textTransfer = TextTransfer.getInstance();
+			clipboard.setContents(new Object[] { sb.toString() }, new Transfer[] { textTransfer });
+			clipboard.dispose();
+		}
 	}
 	
 	/**
