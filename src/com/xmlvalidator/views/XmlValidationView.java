@@ -78,6 +78,8 @@ public class XmlValidationView extends ViewPart {
 	
 	// 검증 중단 플래그
 	private volatile boolean validationCancelled = false;
+	// 검증 완료 플래그
+	private volatile boolean validationCompleted = false;
 	
 	// 선택된 파일들 저장
 	private List<File> selectedXmlFiles = new ArrayList<>();
@@ -95,6 +97,10 @@ public class XmlValidationView extends ViewPart {
 	
 	// 파일별 마지막 수정 시간 추적 (파일 경로 -> 마지막 수정 시간)
 	private Map<String, Long> fileLastModifiedMap = new HashMap<>();
+	
+	// 검증 시작 시간 및 진행 상태
+	private long validationStartTime = 0;
+	private int currentProgress = 0;
 	
 	@Override
 	public void createPartControl(Composite parent) {
@@ -1071,6 +1077,44 @@ public class XmlValidationView extends ViewPart {
 		// Display 객체를 미리 가져와서 스레드에서 사용
 		final Display display = getSite().getShell().getDisplay();
 		
+		// 검증 시작 시간 기록 및 플래그 초기화
+		validationStartTime = System.currentTimeMillis();
+		currentProgress = 0;
+		validationCompleted = false;
+		
+		// Progress Bar 초기화 및 표시
+		if (!progressBar.isDisposed()) {
+			progressBar.setMaximum(selectedXmlFiles.size());
+			progressBar.setSelection(0);
+			progressBar.setVisible(true);
+		}
+		if (!statusLabel.isDisposed()) {
+			statusLabel.setText("검증 중... (0/" + selectedXmlFiles.size() + ") [00:00]");
+		}
+		
+		// 타이머 시작 (1초마다 시간 업데이트)
+		final Runnable timerRunnable = new Runnable() {
+			@Override
+			public void run() {
+				// 검증이 중단되었거나 완료되었으면 타이머 중단
+				if (validationCancelled || validationCompleted) {
+					return;
+				}
+				
+				if (!statusLabel.isDisposed() && !progressBar.isDisposed()) {
+					long elapsedTime = System.currentTimeMillis() - validationStartTime;
+					String timeString = formatElapsedTime(elapsedTime);
+					statusLabel.setText("검증 중... (" + currentProgress + "/" + selectedXmlFiles.size() + ") [" + timeString + "]");
+					
+					// 다음 타이머 예약 (검증이 진행 중인 경우에만)
+					if (!validationCancelled && !validationCompleted) {
+						display.timerExec(1000, this);
+					}
+				}
+			}
+		};
+		display.timerExec(1000, timerRunnable);
+		
 		Thread validationThread = new Thread(new Runnable() {
 			@Override
 			public void run() {
@@ -1090,18 +1134,6 @@ public class XmlValidationView extends ViewPart {
 				XmlSyntaxValidator syntaxValidator = new XmlSyntaxValidator();
 				int validCount = 0;
 				int invalidCount = 0;
-				
-				// Progress Bar 초기화 및 표시
-				display.asyncExec(() -> {
-			if (!progressBar.isDisposed()) {
-				progressBar.setMaximum(selectedXmlFiles.size());
-				progressBar.setSelection(0);
-				progressBar.setVisible(true);
-			}
-			if (!statusLabel.isDisposed()) {
-				statusLabel.setText("검증 중... (0/" + selectedXmlFiles.size() + ")");
-			}
-				});
 				
 				for (int i = 0; i < selectedXmlFiles.size(); i++) {
 			// 검증 중단 확인
@@ -1248,17 +1280,25 @@ public class XmlValidationView extends ViewPart {
 			
 				// 진행 상태 업데이트
 				final int progress = i + 1;
+				currentProgress = progress;
 				display.asyncExec(() -> {
 					if (!progressBar.isDisposed()) {
 						progressBar.setSelection(progress);
 					}
-					if (!statusLabel.isDisposed()) {
-						statusLabel.setText("검증 중... (" + progress + "/" + selectedXmlFiles.size() + ")");
-					}
+					// 타이머가 시간을 업데이트하므로 여기서는 진행 상태만 업데이트
 				});
 			}
 			
 			// 검증 완료/중단 후 UI 상태 복원
+			// 최종 소요 시간 계산
+			final long totalElapsedTime = System.currentTimeMillis() - validationStartTime;
+			final String totalTimeString = formatElapsedTime(totalElapsedTime);
+			
+			// 검증 완료 플래그 설정 (중단되지 않은 경우에만)
+			if (!validationCancelled) {
+				validationCompleted = true;
+			}
+			
 			// 람다에서 사용하기 위해 final 변수로 복사
 			final int finalValidCount = validCount;
 			final int finalInvalidCount = invalidCount;
@@ -1268,6 +1308,7 @@ public class XmlValidationView extends ViewPart {
 			final boolean finalCancelled = validationCancelled;
 			
 			display.asyncExec(() -> {
+				// 타이머는 validationCompleted 플래그로 자동 중단됨
 				if (!progressBar.isDisposed()) {
 					progressBar.setVisible(false);
 				}
@@ -1289,11 +1330,11 @@ public class XmlValidationView extends ViewPart {
 				// 상태 메시지 업데이트
 				String statusMessage;
 				if (finalCancelled) {
-					statusMessage = String.format("검증 중단: %d개 파일 처리됨 (성공: %d, 실패: %d, 오류: %d건) | 전체 누적 오류: %d건",
-							finalValidCount + finalInvalidCount, finalValidCount, finalInvalidCount, finalErrorCount, finalTotalErrors);
+					statusMessage = String.format("검증 중단: %d개 파일 처리됨 (성공: %d, 실패: %d, 오류: %d건) | 전체 누적 오류: %d건 | 소요 시간: %s",
+							finalValidCount + finalInvalidCount, finalValidCount, finalInvalidCount, finalErrorCount, finalTotalErrors, totalTimeString);
 				} else {
-					statusMessage = String.format("검증 완료: 총 %d개 파일 (성공: %d, 실패: %d, 오류: %d건) | 전체 누적 오류: %d건",
-							finalTotalFiles, finalValidCount, finalInvalidCount, finalErrorCount, finalTotalErrors);
+					statusMessage = String.format("검증 완료: 총 %d개 파일 (성공: %d, 실패: %d, 오류: %d건) | 전체 누적 오류: %d건 | 소요 시간: %s",
+							finalTotalFiles, finalValidCount, finalInvalidCount, finalErrorCount, finalTotalErrors, totalTimeString);
 				}
 				if (!statusLabel.isDisposed()) {
 					statusLabel.setText(statusMessage);
@@ -1316,6 +1357,18 @@ public class XmlValidationView extends ViewPart {
 		
 		// 검증 스레드 시작
 		validationThread.start();
+	}
+	
+	/**
+	 * 경과 시간을 mm:ss 형식으로 포맷팅합니다.
+	 * @param elapsedMillis 경과 시간 (밀리초)
+	 * @return mm:ss 형식의 문자열
+	 */
+	private String formatElapsedTime(long elapsedMillis) {
+		long totalSeconds = elapsedMillis / 1000;
+		long minutes = totalSeconds / 60;
+		long seconds = totalSeconds % 60;
+		return String.format("%02d:%02d", minutes, seconds);
 	}
 	
 	/**
