@@ -14,6 +14,8 @@ import org.eclipse.jface.viewers.IDoubleClickListener;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.TableViewer;
 import org.eclipse.jface.viewers.TableViewerColumn;
+import org.eclipse.jface.viewers.Viewer;
+import org.eclipse.jface.viewers.ViewerComparator;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.dnd.Clipboard;
 import org.eclipse.swt.dnd.TextTransfer;
@@ -86,6 +88,13 @@ public class XmlValidationView extends ViewPart {
 	// 검증 완료 플래그
 	private volatile boolean validationCompleted = false;
 	
+	// 선택된 컬럼 인덱스 (참고용, 현재는 사용하지 않음)
+	private int selectedColumnIndex = -1;
+	
+	// 정렬 상태 추적 (컬럼 인덱스 -> 정렬 방향: 0=정렬 없음, 1=오름차순, -1=내림차순)
+	private int currentSortColumn = -1;
+	private int currentSortDirection = 0; // 0=정렬 없음, 1=오름차순, -1=내림차순
+	
 	// 선택된 파일들 저장
 	private List<File> selectedXmlFiles = new ArrayList<>();
 	
@@ -111,19 +120,19 @@ public class XmlValidationView extends ViewPart {
 	@Override
 	public void createPartControl(Composite parent) {
 		try {
-			// 레이아웃 설정
-			GridLayout layout = new GridLayout(1, false);
-			layout.marginWidth = 10;
-			layout.marginHeight = 10;
-			parent.setLayout(layout);
-			
-			// 상단 컨트롤 패널
-			Composite controlPanel = new Composite(parent, SWT.NONE);
-			controlPanel.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
-			GridLayout controlLayout = new GridLayout(4, false);
-			controlLayout.marginWidth = 0;
-			controlLayout.marginHeight = 0;
-			controlPanel.setLayout(controlLayout);
+		// 레이아웃 설정
+		GridLayout layout = new GridLayout(1, false);
+		layout.marginWidth = 10;
+		layout.marginHeight = 10;
+		parent.setLayout(layout);
+		
+		// 상단 컨트롤 패널
+		Composite controlPanel = new Composite(parent, SWT.NONE);
+		controlPanel.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
+		GridLayout controlLayout = new GridLayout(4, false);
+		controlLayout.marginWidth = 0;
+		controlLayout.marginHeight = 0;
+		controlPanel.setLayout(controlLayout);
 		
 		// XML 파일/폴더 선택
 		Label xmlLabel = new Label(controlPanel, SWT.NONE);
@@ -251,7 +260,7 @@ public class XmlValidationView extends ViewPart {
 		
 		// 기본 규칙 파일 설정 및 로드 (statusLabel 생성 후에 호출)
 		try {
-			loadDefaultRuleFile();
+		loadDefaultRuleFile();
 		} catch (Exception e) {
 			System.err.println("기본 규칙 파일 로드 중 오류: " + e.getMessage());
 			e.printStackTrace();
@@ -282,7 +291,7 @@ public class XmlValidationView extends ViewPart {
 			}
 		});
 		
-		// 결과 테이블
+		// 결과 테이블 (행 단위 선택)
 		tableViewer = new TableViewer(parent, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION | SWT.BORDER);
 		tableViewer.getControl().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 		
@@ -305,26 +314,107 @@ public class XmlValidationView extends ViewPart {
 			}
 		});
 		
-		// 더블클릭 시 파일 열기
-		tableViewer.addDoubleClickListener(new IDoubleClickListener() {
-			@Override
-			public void doubleClick(DoubleClickEvent event) {
-				System.out.println("더블클릭 이벤트 발생");
-				IStructuredSelection selection = (IStructuredSelection) event.getSelection();
-				Object selected = selection.getFirstElement();
-				System.out.println("선택된 객체: " + (selected != null ? selected.getClass().getName() : "null"));
-				
-				if (selected instanceof ValidationError) {
-					ValidationError error = (ValidationError) selected;
-					System.out.println("ValidationError 발견:");
+		// 마우스 클릭 시 선택된 컬럼 인덱스 추적 (행 단위 선택)
+		table.addListener(SWT.MouseDown, event -> {
+			org.eclipse.swt.widgets.Table table2 = (org.eclipse.swt.widgets.Table) event.widget;
+			org.eclipse.swt.widgets.TableItem item = null;
+			try {
+				item = table2.getItem(new org.eclipse.swt.graphics.Point(event.x, event.y));
+			} catch (Exception e) {
+				// 항목을 찾을 수 없는 경우 처리
+			}
+			
+			if (item != null) {
+				int columnIndex = getColumnIndexAt(table2, event.x);
+				if (columnIndex >= 0) {
+					selectedColumnIndex = columnIndex;
+				}
+			}
+		});
+		
+		// 더블클릭 시 파일 열기 (테이블에 직접 이벤트 추가)
+		table.addListener(SWT.MouseDoubleClick, event -> {
+			org.eclipse.swt.widgets.Table table2 = (org.eclipse.swt.widgets.Table) event.widget;
+			org.eclipse.swt.widgets.TableItem item = null;
+			
+			try {
+				// 마우스 위치에서 항목 가져오기 시도
+				org.eclipse.swt.graphics.Point point = new org.eclipse.swt.graphics.Point(event.x, event.y);
+				item = table2.getItem(point);
+			} catch (Exception e) {
+				// 항목을 찾을 수 없는 경우, 선택된 항목 사용
+				org.eclipse.swt.widgets.TableItem[] selectedItems = table2.getSelection();
+				if (selectedItems != null && selectedItems.length > 0) {
+					item = selectedItems[0];
+				}
+			}
+			
+			if (item != null) {
+				Object element = item.getData();
+				if (element instanceof ValidationError) {
+					ValidationError error = (ValidationError) element;
+					System.out.println("더블클릭 이벤트 발생 (테이블 직접 이벤트):");
 					System.out.println("  파일: " + error.getFile().getAbsolutePath());
 					System.out.println("  라인 번호: " + error.getLineNumber());
 					System.out.println("  컬럼 번호: " + error.getColumnNumber());
 					System.out.println("  메시지: " + error.getMessage());
 					
 					openFileInEditor(error.getFile(), error.getLineNumber());
+					// 이벤트 소비하여 추가 처리 방지
+					event.doit = false;
+				}
+			}
+		});
+		
+		// 더블클릭 시 파일 열기 (TableViewer 리스너 - 백업)
+		tableViewer.addDoubleClickListener(new IDoubleClickListener() {
+			@Override
+			public void doubleClick(DoubleClickEvent event) {
+				System.out.println("더블클릭 이벤트 발생 (TableViewer 리스너)");
+				
+				IStructuredSelection selection = null;
+				if (event.getSelection() instanceof IStructuredSelection) {
+					selection = (IStructuredSelection) event.getSelection();
+				}
+				
+				// 선택이 없으면 테이블에서 선택된 항목 가져오기
+				if (selection == null || selection.isEmpty()) {
+					org.eclipse.swt.widgets.Table table2 = tableViewer.getTable();
+					org.eclipse.swt.widgets.TableItem[] selectedItems = table2.getSelection();
+					if (selectedItems != null && selectedItems.length > 0) {
+						Object element = selectedItems[0].getData();
+						if (element instanceof ValidationError) {
+							ValidationError error = (ValidationError) element;
+							System.out.println("선택된 행에서 ValidationError 발견:");
+							System.out.println("  파일: " + error.getFile().getAbsolutePath());
+							System.out.println("  라인 번호: " + error.getLineNumber());
+							System.out.println("  컬럼 번호: " + error.getColumnNumber());
+							System.out.println("  메시지: " + error.getMessage());
+							
+							openFileInEditor(error.getFile(), error.getLineNumber());
+							return;
+						}
+					}
+				}
+				
+				if (selection != null) {
+				Object selected = selection.getFirstElement();
+					System.out.println("선택된 객체: " + (selected != null ? selected.getClass().getName() : "null"));
+					
+				if (selected instanceof ValidationError) {
+					ValidationError error = (ValidationError) selected;
+						System.out.println("ValidationError 발견:");
+						System.out.println("  파일: " + error.getFile().getAbsolutePath());
+						System.out.println("  라인 번호: " + error.getLineNumber());
+						System.out.println("  컬럼 번호: " + error.getColumnNumber());
+						System.out.println("  메시지: " + error.getMessage());
+						
+					openFileInEditor(error.getFile(), error.getLineNumber());
+					} else {
+						System.out.println("경고: 선택된 객체가 ValidationError가 아닙니다.");
+					}
 				} else {
-					System.out.println("경고: 선택된 객체가 ValidationError가 아닙니다.");
+					System.out.println("경고: 선택된 항목이 없습니다.");
 				}
 			}
 		});
@@ -424,11 +514,11 @@ public class XmlValidationView extends ViewPart {
 			
 			page.addPartListener(partListener);
 			
-			IEditorPart editor = IDE.openEditorOnFileStore(page, fileStore);
+				IEditorPart editor = IDE.openEditorOnFileStore(page, fileStore);
 			System.out.println("에디터 타입: " + (editor != null ? editor.getClass().getName() : "null"));
 			System.out.println("ITextEditor 인스턴스인가? " + (editor instanceof ITextEditor));
-			
-			// 라인 번호가 유효하면 해당 라인으로 이동
+				
+				// 라인 번호가 유효하면 해당 라인으로 이동
 			if (lineNumber > 0) {
 				// 즉시 시도
 				navigateToLineInEditor(editor, lineNumber);
@@ -494,9 +584,9 @@ public class XmlValidationView extends ViewPart {
 					return;
 				}
 				
-				IDocument document = textEditor.getDocumentProvider()
-						.getDocument(textEditor.getEditorInput());
-				
+					IDocument document = textEditor.getDocumentProvider()
+							.getDocument(textEditor.getEditorInput());
+					
 				if (document == null) {
 					System.out.println("문서가 null입니다. 재시도...");
 					if (retryCount < 30) {
@@ -523,7 +613,7 @@ public class XmlValidationView extends ViewPart {
 					
 					System.out.println("목표 라인: " + targetLine);
 					
-					// 라인 번호는 1부터 시작하지만 getLineOffset은 0부터 시작
+							// 라인 번호는 1부터 시작하지만 getLineOffset은 0부터 시작
 					int lineIndex = targetLine - 1;
 					
 					try {
@@ -539,14 +629,14 @@ public class XmlValidationView extends ViewPart {
 						
 						// 라인 시작 위치로 이동하고 선택
 						// offset 위치에 커서를 두고, 0 길이로 선택 (커서만 이동)
-						textEditor.selectAndReveal(offset, 0);
+							textEditor.selectAndReveal(offset, 0);
 						
 						// 추가로 한 번 더 시도 (때로는 한 번만으로는 작동하지 않음)
 						Display.getCurrent().timerExec(100, () -> {
 							try {
 								textEditor.selectAndReveal(offset, 0);
 								textEditor.setFocus();
-							} catch (Exception e) {
+						} catch (Exception e) {
 								// 무시
 							}
 						});
@@ -726,7 +816,7 @@ public class XmlValidationView extends ViewPart {
 			try {
 				currentRuleFile = ruleFile.getCanonicalFile();
 			} catch (Exception e) {
-				currentRuleFile = ruleFile;
+			currentRuleFile = ruleFile;
 			}
 			
 			// 파일명만 표시
@@ -754,6 +844,21 @@ public class XmlValidationView extends ViewPart {
 	}
 	
 	private void createColumns() {
+		// 시간 컬럼 (제일 앞쪽)
+		TableViewerColumn timeColumn = new TableViewerColumn(tableViewer, SWT.NONE);
+		timeColumn.getColumn().setWidth(160);
+		timeColumn.getColumn().setText("시간");
+		timeColumn.setLabelProvider(new ColumnLabelProvider() {
+			@Override
+			public String getText(Object element) {
+				if (element instanceof ValidationError) {
+					return ((ValidationError) element).getFormattedTimestamp();
+				}
+				return "";
+			}
+		});
+		addColumnSorting(timeColumn, 0);
+		
 		// 오류 유형 컬럼
 		TableViewerColumn typeColumn = new TableViewerColumn(tableViewer, SWT.NONE);
 		typeColumn.getColumn().setWidth(100);
@@ -783,6 +888,7 @@ public class XmlValidationView extends ViewPart {
 				return null;
 			}
 		});
+		addColumnSorting(typeColumn, 1);
 		
 		// 파일명 컬럼
 		TableViewerColumn fileColumn = new TableViewerColumn(tableViewer, SWT.NONE);
@@ -797,6 +903,7 @@ public class XmlValidationView extends ViewPart {
 				return "";
 			}
 		});
+		addColumnSorting(fileColumn, 2);
 		
 		// 라인 번호 컬럼
 		TableViewerColumn lineColumn = new TableViewerColumn(tableViewer, SWT.NONE);
@@ -812,6 +919,7 @@ public class XmlValidationView extends ViewPart {
 				return "";
 			}
 		});
+		addColumnSorting(lineColumn, 3);
 		
 		// 오류 메시지 컬럼
 		TableViewerColumn messageColumn = new TableViewerColumn(tableViewer, SWT.NONE);
@@ -826,6 +934,95 @@ public class XmlValidationView extends ViewPart {
 				return "";
 			}
 		});
+		addColumnSorting(messageColumn, 4);
+	}
+	
+	/**
+	 * 컬럼에 헤더 클릭 정렬 기능을 추가합니다.
+	 */
+	private void addColumnSorting(TableViewerColumn column, final int columnIndex) {
+		column.getColumn().addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				// 정렬 방향 결정
+				if (currentSortColumn == columnIndex) {
+					// 같은 컬럼을 다시 클릭하면 정렬 방향 전환
+					currentSortDirection = (currentSortDirection == 1) ? -1 : 1;
+				} else {
+					// 다른 컬럼을 클릭하면 오름차순으로 시작
+					currentSortColumn = columnIndex;
+					currentSortDirection = 1;
+				}
+				
+				// 모든 컬럼의 헤더 텍스트 업데이트 (화살표 표시)
+				updateColumnHeaders();
+				
+				// 정렬 적용
+				tableViewer.setComparator(new ViewerComparator() {
+					@Override
+					public int compare(Viewer viewer, Object e1, Object e2) {
+						if (!(e1 instanceof ValidationError) || !(e2 instanceof ValidationError)) {
+							return 0;
+						}
+						
+						ValidationError error1 = (ValidationError) e1;
+						ValidationError error2 = (ValidationError) e2;
+						
+						int result = 0;
+						
+						switch (currentSortColumn) {
+						case 0: // 시간
+							result = error1.getTimestamp().compareTo(error2.getTimestamp());
+							break;
+						case 1: // 유형
+							String type1 = error1.getErrorType() != null ? error1.getErrorType().getDescription() : "오류";
+							String type2 = error2.getErrorType() != null ? error2.getErrorType().getDescription() : "오류";
+							result = type1.compareTo(type2);
+							break;
+						case 2: // 파일명
+							result = error1.getFile().getName().compareTo(error2.getFile().getName());
+							break;
+						case 3: // 라인 번호
+							result = Integer.compare(error1.getLineNumber(), error2.getLineNumber());
+							break;
+						case 4: // 오류 메시지
+							result = error1.getMessage().compareTo(error2.getMessage());
+							break;
+						default:
+							return 0;
+						}
+						
+						// 정렬 방향 적용
+						return currentSortDirection * result;
+					}
+				});
+			}
+		});
+	}
+	
+	/**
+	 * 모든 컬럼의 헤더 텍스트를 업데이트하여 정렬 방향을 표시합니다.
+	 */
+	private void updateColumnHeaders() {
+		org.eclipse.swt.widgets.Table table = tableViewer.getTable();
+		org.eclipse.swt.widgets.TableColumn[] columns = table.getColumns();
+		
+		String[] columnNames = { "시간", "유형", "파일", "라인", "오류 메시지" };
+		
+		for (int i = 0; i < columns.length && i < columnNames.length; i++) {
+			String headerText = columnNames[i];
+			
+			if (i == currentSortColumn && currentSortDirection != 0) {
+				// 정렬 방향에 따라 화살표 추가
+				if (currentSortDirection == 1) {
+					headerText += " ▲"; // 오름차순
+				} else {
+					headerText += " ▼"; // 내림차순
+				}
+			}
+			
+			columns[i].setText(headerText);
+		}
 	}
 	
 	/**
@@ -1138,24 +1335,24 @@ public class XmlValidationView extends ViewPart {
 		Thread validationThread = new Thread(new Runnable() {
 			@Override
 			public void run() {
-				// 디버깅: 로드된 규칙 정보 출력
-				System.out.println("======================================");
-				System.out.println("검증 시작");
-				System.out.println("XML 파일 수: " + selectedXmlFiles.size());
-				System.out.println("규칙 파서 상태: " + (ruleParser != null ? "로드됨" : "없음"));
-				if (ruleParser != null) {
-					System.out.println("파싱된 규칙: " + ruleParser.getRules());
-					System.out.println("파싱된 규칙 키: " + ruleParser.getRules().keySet());
-				}
-				System.out.println("======================================");
-				
-				// 검증 수행
-				List<ValidationError> allErrors = new ArrayList<>();
-				XmlSyntaxValidator syntaxValidator = new XmlSyntaxValidator();
-				int validCount = 0;
-				int invalidCount = 0;
-				
-				for (int i = 0; i < selectedXmlFiles.size(); i++) {
+		// 디버깅: 로드된 규칙 정보 출력
+		System.out.println("======================================");
+		System.out.println("검증 시작");
+		System.out.println("XML 파일 수: " + selectedXmlFiles.size());
+		System.out.println("규칙 파서 상태: " + (ruleParser != null ? "로드됨" : "없음"));
+		if (ruleParser != null) {
+			System.out.println("파싱된 규칙: " + ruleParser.getRules());
+			System.out.println("파싱된 규칙 키: " + ruleParser.getRules().keySet());
+		}
+		System.out.println("======================================");
+		
+		// 검증 수행
+		List<ValidationError> allErrors = new ArrayList<>();
+		XmlSyntaxValidator syntaxValidator = new XmlSyntaxValidator();
+		int validCount = 0;
+		int invalidCount = 0;
+		
+		for (int i = 0; i < selectedXmlFiles.size(); i++) {
 			// 검증 중단 확인
 			if (validationCancelled) {
 				System.out.println("검증이 중단되었습니다. (" + i + "/" + selectedXmlFiles.size() + " 파일 처리됨)");
@@ -1167,9 +1364,6 @@ public class XmlValidationView extends ViewPart {
 			
 			// 항상 최신 파일 객체를 생성하여 사용 (캐시 문제 방지)
 			File xmlFile = new File(filePath);
-			
-			// 현재 검증 중인 파일 이름 업데이트
-			currentFileName = xmlFile.getName();
 			
 			// 파일이 존재하는지 확인
 			if (!xmlFile.exists()) {
@@ -1208,10 +1402,27 @@ public class XmlValidationView extends ViewPart {
 				break;
 			}
 			
+			// 현재 검증 중인 파일 이름 및 진행 상태를 실제 검증 시작 직전에 설정
+			// UI 스레드에서 동기적으로 업데이트하여 타이머가 올바른 파일명을 표시하도록 함
+			final String fileName = xmlFile.getName();
+			final int fileIndex = i + 1; // 1-based로 표시
+			display.syncExec(() -> {
+				currentFileName = fileName;  // 현재 검증 중인 파일명 설정
+				currentProgress = fileIndex; // 현재 검증 중인 파일 번호 (1-based)
+			});
+			
+			// 파일 검증 시작 시간 기록
+			long fileValidationStartTime = System.currentTimeMillis();
+			System.out.println("[" + (i + 1) + "/" + selectedXmlFiles.size() + "] 파일 검증 시작: " + fileName);
+			
 			boolean hasError = false;
 			
 			// 1. 문법 체크
+			System.out.println("[" + (i + 1) + "/" + selectedXmlFiles.size() + "] 문법 체크 시작: " + fileName);
+			long syntaxStartTime = System.currentTimeMillis();
 			boolean syntaxValid = syntaxValidator.validate(xmlFile);
+			long syntaxElapsedTime = System.currentTimeMillis() - syntaxStartTime;
+			System.out.println("[" + (i + 1) + "/" + selectedXmlFiles.size() + "] 문법 체크 완료: " + fileName + " (소요 시간: " + syntaxElapsedTime + "ms, 결과: " + (syntaxValid ? "통과" : "실패") + ")");
 			
 			// 검증 중단 확인 (문법 체크 후)
 			if (validationCancelled) {
@@ -1232,12 +1443,27 @@ public class XmlValidationView extends ViewPart {
 						System.out.println("검증이 중단되었습니다. (" + i + "/" + selectedXmlFiles.size() + " 파일 처리됨)");
 						break;
 					}
-					allErrors.add(new ValidationError(
+					ValidationError newError = new ValidationError(
 							error.getFile(), 
 							error.getLineNumber(), 
 							error.getColumnNumber(), 
 							error.getMessage(),
-							ValidationError.ErrorType.SYNTAX));
+							ValidationError.ErrorType.SYNTAX);
+					allErrors.add(newError);
+					
+					// 오류가 발견되는 즉시 화면에 표시 (라인 순서대로)
+					allValidationErrors.add(newError);
+					final ValidationError errorToAdd = newError;
+					display.asyncExec(() -> {
+						if (!tableViewer.getControl().isDisposed()) {
+							tableViewer.setInput(allValidationErrors);
+							// 새로 추가된 오류가 보이도록 마지막 행으로 스크롤
+							int itemCount = tableViewer.getTable().getItemCount();
+							if (itemCount > 0) {
+								tableViewer.getTable().setTopIndex(itemCount - 1);
+							}
+						}
+					});
 				}
 				hasError = true;
 			}
@@ -1256,8 +1482,12 @@ public class XmlValidationView extends ViewPart {
 					break;
 				}
 				
+				System.out.println("[" + (i + 1) + "/" + selectedXmlFiles.size() + "] 정합성 체크 시작: " + fileName);
+				long consistencyStartTime = System.currentTimeMillis();
 				ConsistencyValidator consistencyValidator = new ConsistencyValidator(ruleParser);
 				boolean consistencyValid = consistencyValidator.validate(xmlFile);
+				long consistencyElapsedTime = System.currentTimeMillis() - consistencyStartTime;
+				System.out.println("[" + (i + 1) + "/" + selectedXmlFiles.size() + "] 정합성 체크 완료: " + fileName + " (소요 시간: " + consistencyElapsedTime + "ms, 결과: " + (consistencyValid ? "통과" : "실패") + ", 오류 수: " + consistencyValidator.getErrors().size() + ")");
 				
 				// 검증 중단 확인 (정합성 체크 후)
 				if (validationCancelled) {
@@ -1278,12 +1508,27 @@ public class XmlValidationView extends ViewPart {
 							System.out.println("검증이 중단되었습니다. (" + i + "/" + selectedXmlFiles.size() + " 파일 처리됨)");
 							break;
 						}
-						allErrors.add(new ValidationError(
+						ValidationError newError = new ValidationError(
 								error.getFile(), 
 								error.getLineNumber(), 
 								error.getColumnNumber(), 
 								error.getMessage(),
-								ValidationError.ErrorType.CONSISTENCY));
+								ValidationError.ErrorType.CONSISTENCY);
+						allErrors.add(newError);
+						
+						// 오류가 발견되는 즉시 화면에 표시 (라인 순서대로)
+						allValidationErrors.add(newError);
+						final ValidationError errorToAdd = newError;
+						display.asyncExec(() -> {
+							if (!tableViewer.getControl().isDisposed()) {
+								tableViewer.setInput(allValidationErrors);
+								// 새로 추가된 오류가 보이도록 마지막 행으로 스크롤
+								int itemCount = tableViewer.getTable().getItemCount();
+								if (itemCount > 0) {
+									tableViewer.getTable().setTopIndex(itemCount - 1);
+								}
+							}
+						});
 					}
 					hasError = true;
 				}
@@ -1301,15 +1546,19 @@ public class XmlValidationView extends ViewPart {
 				validCount++;
 			}
 			
-				// 진행 상태 업데이트
-				final int progress = i + 1;
-				currentProgress = progress;
-				display.asyncExec(() -> {
-					if (!progressBar.isDisposed()) {
-						progressBar.setSelection(progress);
-					}
-					// 타이머가 시간을 업데이트하므로 여기서는 진행 상태만 업데이트
-				});
+			// 파일 검증 완료 시간 기록
+			long fileValidationElapsedTime = System.currentTimeMillis() - fileValidationStartTime;
+			System.out.println("[" + (i + 1) + "/" + selectedXmlFiles.size() + "] 파일 검증 완료: " + fileName + " (총 소요 시간: " + fileValidationElapsedTime + "ms, 결과: " + (hasError ? "실패" : "성공") + ")");
+			
+				// 진행 상태 업데이트 (파일 검증 완료 후)
+			// Progress Bar만 업데이트하고, currentProgress와 currentFileName은 다음 파일 검증 시작 시까지 유지
+			final int progress = i + 1;
+			display.asyncExec(() -> {
+				if (!progressBar.isDisposed()) {
+					progressBar.setSelection(progress);
+				}
+				// currentFileName과 currentProgress는 다음 파일 검증 시작 시에 함께 업데이트됨
+			});
 			}
 			
 			// 검증 완료/중단 후 UI 상태 복원
@@ -1344,14 +1593,15 @@ public class XmlValidationView extends ViewPart {
 				}
 			});
 			
-			// 새로운 오류를 기존 오류 리스트의 앞에 추가 (최신 오류가 상단에 표시)
-			allValidationErrors.addAll(0, allErrors);
+			// 오류는 발견되는 즉시 화면에 표시되므로, 여기서는 중복 추가하지 않음
+			// 이미 각 오류가 발견될 때마다 allValidationErrors에 추가되고 UI가 업데이트됨
 			
-			// 결과 표시 (모든 오류 포함) - UI 스레드에서 실행
+			// 결과 표시 (최종 상태 메시지만 업데이트) - UI 스레드에서 실행
 			display.asyncExec(() -> {
-				tableViewer.setInput(allValidationErrors);
-				
-				// 상태 메시지 업데이트
+				// TableViewer는 이미 오류가 발견될 때마다 업데이트되었으므로 재설정 불필요
+				// 하지만 최종 상태 메시지는 업데이트 필요
+		
+		// 상태 메시지 업데이트
 				String statusMessage;
 				if (finalCancelled) {
 					statusMessage = String.format("검증 중단: %d개 파일 처리됨 (성공: %d, 실패: %d, 오류: %d건) | 전체 누적 오류: %d건 | 소요 시간: %s",
@@ -1361,17 +1611,17 @@ public class XmlValidationView extends ViewPart {
 							finalTotalFiles, finalValidCount, finalInvalidCount, finalErrorCount, finalTotalErrors, totalTimeString);
 				}
 				if (!statusLabel.isDisposed()) {
-					statusLabel.setText(statusMessage);
+		statusLabel.setText(statusMessage);
 				}
 			});
-			
+		
 			// 결과 메시지 (UI 스레드에서 실행)
 			display.asyncExec(() -> {
 				if (finalErrorCount == 0) {
-					MessageDialog.openInformation(getSite().getShell(), "검증 완료", 
+			MessageDialog.openInformation(getSite().getShell(), "검증 완료", 
 							"모든 " + finalTotalFiles + "개 XML 파일이 검증을 통과했습니다.");
-				} else {
-					MessageDialog.openWarning(getSite().getShell(), "검증 완료", 
+		} else {
+			MessageDialog.openWarning(getSite().getShell(), "검증 완료", 
 							finalTotalFiles + "개 파일 중 " + finalInvalidCount + "개 파일에서 " + 
 							finalErrorCount + "건의 오류가 발견되었습니다.");
 				}
@@ -1405,7 +1655,83 @@ public class XmlValidationView extends ViewPart {
 	}
 	
 	/**
-	 * 선택된 테이블 행의 파일명과 오류 메시지를 클립보드에 복사합니다.
+	 * 마우스 클릭 위치(x 좌표)에 해당하는 컬럼 인덱스를 반환합니다.
+	 * 모든 컬럼에 대해 정확히 인식하도록 개선되었습니다.
+	 * TableItem.getBounds(int columnIndex)를 사용하여 정확한 컬럼 위치를 계산합니다.
+	 */
+	private int getColumnIndexAt(org.eclipse.swt.widgets.Table table, int x) {
+		org.eclipse.swt.widgets.TableColumn[] columns = table.getColumns();
+		if (columns == null || columns.length == 0) {
+			return -1;
+		}
+		
+		// TableItem의 bounds를 사용하여 정확한 컬럼 위치 계산
+		org.eclipse.swt.widgets.TableItem[] items = table.getItems();
+		if (items != null && items.length > 0) {
+			org.eclipse.swt.widgets.TableItem firstItem = items[0];
+			if (firstItem != null && !firstItem.isDisposed()) {
+				// 각 컬럼의 실제 위치를 확인하여 정확한 컬럼 인덱스 찾기
+				for (int i = 0; i < columns.length; i++) {
+					try {
+						org.eclipse.swt.graphics.Rectangle bounds = firstItem.getBounds(i);
+						if (bounds != null) {
+							// 컬럼의 실제 위치와 너비를 사용하여 정확한 컬럼 인덱스 찾기
+							if (x >= bounds.x && x < bounds.x + bounds.width) {
+								return i;
+							}
+						}
+					} catch (Exception e) {
+						// getBounds가 실패할 수 있으므로 계속 진행
+						continue;
+					}
+				}
+			}
+		}
+		
+		// TableItem.getBounds가 실패한 경우 대체 방법 사용
+		// 테이블의 첫 번째 컬럼 앞의 오프셋을 고려
+		int currentX = 0;
+		if (items != null && items.length > 0) {
+			try {
+				org.eclipse.swt.graphics.Rectangle firstBounds = items[0].getBounds(0);
+				if (firstBounds != null) {
+					currentX = firstBounds.x;
+				}
+			} catch (Exception e) {
+				// 무시하고 계속 진행
+			}
+		}
+		
+		// 오프셋을 고려하여 x 좌표 조정
+		int adjustedX = x - currentX;
+		if (adjustedX < 0) {
+			// 첫 번째 컬럼 앞의 영역
+			return 0;
+		}
+		
+		int columnStartX = 0;
+		for (int i = 0; i < columns.length; i++) {
+			if (columns[i] == null || columns[i].isDisposed()) {
+				continue;
+			}
+			int columnWidth = columns[i].getWidth();
+			// 컬럼 경계를 정확히 계산하여 모든 컬럼 인식
+			if (adjustedX >= columnStartX && adjustedX < columnStartX + columnWidth) {
+				return i;
+			}
+			columnStartX += columnWidth;
+		}
+		
+		// 마지막 컬럼의 오른쪽 경계를 넘어선 경우 마지막 컬럼 반환
+		if (columns.length > 0) {
+			return columns.length - 1;
+		}
+		
+		return -1;
+	}
+	
+	/**
+	 * 선택된 테이블 행의 내용을 클립보드에 복사합니다.
 	 */
 	private void copySelectedTableText() {
 		org.eclipse.swt.widgets.Table table = tableViewer.getTable();
@@ -1416,14 +1742,28 @@ public class XmlValidationView extends ViewPart {
 		}
 		
 		StringBuilder sb = new StringBuilder();
+		
 		for (int i = 0; i < selectionIndices.length; i++) {
 			int index = selectionIndices[i];
 			Object element = tableViewer.getElementAt(index);
+			
 			if (element instanceof ValidationError) {
 				ValidationError error = (ValidationError) element;
+				
+				// 전체 행 복사
+				String time = error.getFormattedTimestamp();
+				String type = error.getErrorType() != null ? error.getErrorType().getDescription() : "오류";
 				String fileName = error.getFile().getName();
+				int line = error.getLineNumber();
+				String lineStr = line > 0 ? String.valueOf(line) : "-";
 				String message = error.getMessage();
-				sb.append(fileName).append("\t").append(message);
+				
+				sb.append(time).append("\t")
+				  .append(type).append("\t")
+				  .append(fileName).append("\t")
+				  .append(lineStr).append("\t")
+				  .append(message);
+				
 				if (i < selectionIndices.length - 1) {
 					sb.append(System.lineSeparator());
 				}

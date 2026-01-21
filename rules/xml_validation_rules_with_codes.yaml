@@ -99,12 +99,13 @@ rules:
             occurrence: '1'
             required: required
             data_type: '200'  # 주소 (요소 텍스트 값, 최대 200자)
-            note: 주소는 요소의 텍스트 값으로 최대 200자입니다. 우편번호는 ZipCode 속성으로 정확히 6자여야 합니다.
+            note: 주소는 요소의 텍스트 값으로 최대 200자입니다. 우편번호는 ZipCode 속성으로 5~6자여야 합니다.
             attributes:
               ZipCode:
                 type: fixed_length
-                length: 6
-                description: 우편번호 (정확히 6자)
+                min_length: 5
+                max_length: 6
+                description: 우편번호 (5~6자, 신 우편번호 5자리 또는 구 우편번호 6자리)
           Email:
             description: 이메일
             occurrence: 0..1
@@ -1262,13 +1263,13 @@ rules:
                 data_type: '50'  # 지점명 (요소 텍스트 값, 최대 50자)
                 format: 지점명 금칙어 체크(<,>,",;)
                 validation_rule_2: "거래채널코드가 '02','04','06' \n(자동화기기, 인터넷뱅킹, 콜센터)\n이외의 경우에 필수"
-                note: '지점명은 요소의 텍스트 값으로 최대 50자입니다. 우편번호는 ZipCode 속성으로 6자, 지점코드는 Code 속성으로 7자여야 합니다. Code(지점코드) : 은행연합회에 등록한 지점코드'
+                note: '지점명은 요소의 텍스트 값으로 최대 50자입니다. 우편번호는 ZipCode 속성으로 5~6자, 지점코드는 Code 속성으로 7자여야 합니다. Code(지점코드) : 은행연합회에 등록한 지점코드'
                 attributes:
                   ZipCode:
                     type: fixed_length
-                    length: 6
-                    description: 우편번호 (정확히 6자)
-                    # TODO: 우편번호 형식 검증 필요 (6자리 숫자)
+                    min_length: 5
+                    max_length: 6
+                    description: 우편번호 (5~6자, 신 우편번호 5자리 또는 구 우편번호 6자리)
                   Code:
                     type: fixed_length
                     length: 7
@@ -1302,10 +1303,11 @@ rules:
                     note: 실명번호는 요소의 텍스트 값으로 최대 20자입니다. 실명번호구분코드는 Code 속성으로 2자여야 합니다.
                     attributes:
                       Code:
-                        type: fixed_length
+                        type: enum
                         length: 2
                         required: true
                         description: 실명번호구분코드 (정확히 2자)
+                        code_ref: 실명번호구분
                   InsuRelDesc:
                     description: 거래자역할 기타기재
                     occurrence: 0..1
@@ -1471,10 +1473,11 @@ rules:
                 note: 실명번호는 요소의 텍스트 값으로 최대 20자입니다. 실명번호구분코드는 Code 속성으로 2자여야 합니다.
                 attributes:
                   Code:
-                    type: fixed_length
+                    type: enum
                     length: 2
                     required: true
                     description: 실명번호구분코드 (정확히 2자)
+                    code_ref: 실명번호구분
               CINumber:
                 description: CI 번호
                 occurrence: 0..1
@@ -1519,23 +1522,25 @@ rules:
                 validation_rule_2: '1. <UserRelation>의 거래자역할이 ''01'',''08'', ''11''일 경우
 
                   자택 또는 직장주소 중 최소 1가지 기재'
-                note: 주소(자택)는 요소의 텍스트 값으로 최대 200자입니다. 우편번호는 ZipCode 속성으로 정확히 6자여야 합니다.
+                note: 주소(자택)는 요소의 텍스트 값으로 최대 200자입니다. 우편번호는 ZipCode 속성으로 5~6자여야 합니다.
                 attributes:
                   ZipCode:
                     type: fixed_length
-                    length: 6
-                    description: 우편번호 (정확히 6자)
+                    min_length: 5
+                    max_length: 6
+                    description: 우편번호 (5~6자, 신 우편번호 5자리 또는 구 우편번호 6자리)
               AddressCompany:
                 description: 주소(직장) 우편번호*
                 occurrence: 0..1
                 required: required
                 data_type: '200'  # 주소(직장) (요소 텍스트 값, 최대 200자)
-                note: 주소(직장)는 요소의 텍스트 값으로 최대 200자입니다. 우편번호는 ZipCode 속성으로 정확히 6자여야 합니다.
+                note: 주소(직장)는 요소의 텍스트 값으로 최대 200자입니다. 우편번호는 ZipCode 속성으로 5~6자여야 합니다.
                 attributes:
                   ZipCode:
                     type: fixed_length
-                    length: 6
-                    description: 우편번호 (정확히 6자)
+                    min_length: 5
+                    max_length: 6
+                    description: 우편번호 (5~6자, 신 우편번호 5자리 또는 구 우편번호 6자리)
                   Code: ''
               BirthDay:
                 description: 거래자 생년월일/사업체 설립일
@@ -1717,10 +1722,11 @@ rules:
                 note: 계좌주실명번호는 요소의 텍스트 값으로 최대 20자입니다. 실명번호구분코드는 Code 속성으로 2자여야 합니다.
                 attributes:
                   Code:
-                    type: fixed_length
+                    type: enum
                     length: 2
                     required: true
                     description: 실명번호구분코드 (정확히 2자)
+                    code_ref: 실명번호구분
               AccountUserCINumber:
                 description: 계좌주 CI 번호
                 occurrence: 0..1
@@ -1745,10 +1751,11 @@ rules:
                 note: 대리인실명번호는 요소의 텍스트 값으로 최대 20자입니다. 실명번호구분코드는 Code 속성으로 2자여야 합니다.
                 attributes:
                   Code:
-                    type: fixed_length
+                    type: enum
                     length: 2
                     required: true
                     description: 실명번호구분코드 (정확히 2자)
+                    code_ref: 실명번호구분
               AgentUserCINumber:
                 description: 대리인 CI 번호
                 occurrence: 0..1
@@ -1794,10 +1801,11 @@ rules:
                 note: 실명번호는 요소의 텍스트 값으로 최대 20자입니다. 실명번호구분코드는 Code 속성으로 2자여야 합니다.
                 attributes:
                   Code:
-                    type: fixed_length
+                    type: enum
                     length: 2
                     required: true
                     description: 실명번호구분코드 (정확히 2자)
+                    code_ref: 실명번호구분
               PrincipalUserCINumber:
                 description: 거래자, 계좌주, 송/수취계좌주,법인/단체 CI 번호
                 occurrence: 0..1
@@ -1816,10 +1824,11 @@ rules:
                 note: 관계인 실명번호는 요소의 텍스트 값으로 최대 20자입니다. 실명번호구분코드는 Code 속성으로 2자여야 합니다.
                 attributes:
                   Code:
-                    type: fixed_length
+                    type: enum
                     length: 2
                     required: true
                     description: 실명번호구분코드 (정확히 2자)
+                    code_ref: 실명번호구분
               ParticipantUserCINumber:
                 description: 관계인 CI 번호
                 occurrence: 0..1

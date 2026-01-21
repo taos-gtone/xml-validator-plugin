@@ -1,6 +1,8 @@
 package com.xmlvalidator.model;
 
 import java.io.File;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * 검증 오류 정보를 담는 모델 클래스
@@ -26,12 +28,15 @@ public class ValidationError {
 		}
 	}
 	
+	private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+	
 	private File file;
 	private int lineNumber;
 	private int columnNumber;
 	private String message;
 	private ErrorType errorType;
 	private String elementPath;
+	private LocalDateTime timestamp;
 	
 	public ValidationError(File file, int lineNumber, int columnNumber, String message) {
 		this(file, lineNumber, columnNumber, message, ErrorType.SYNTAX, null);
@@ -49,6 +54,7 @@ public class ValidationError {
 		this.message = message;
 		this.errorType = errorType;
 		this.elementPath = elementPath;
+		this.timestamp = LocalDateTime.now();
 	}
 	
 	public File getFile() {
@@ -73,6 +79,17 @@ public class ValidationError {
 	
 	public String getElementPath() {
 		return elementPath;
+	}
+	
+	public LocalDateTime getTimestamp() {
+		return timestamp;
+	}
+	
+	public String getFormattedTimestamp() {
+		if (timestamp != null) {
+			return timestamp.format(TIME_FORMATTER);
+		}
+		return "";
 	}
 	
 	@Override
