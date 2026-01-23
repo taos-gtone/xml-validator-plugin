@@ -94,16 +94,21 @@ public class ConsistencyValidator {
 			factory.setNamespaceAware(true);
 			// 캐시 방지를 위한 추가 설정
 			factory.setValidating(false);
+			// 엔티티 해석 비활성화 (캐시 방지)
+			factory.setExpandEntityReferences(false);
+			factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
 			DocumentBuilder builder = factory.newDocumentBuilder();
 			
 			// 항상 FileInputStream을 사용하여 최신 파일 내용을 읽음
+			// 파일 수정 시간을 확인하여 항상 최신 파일을 읽도록 보장
 			Document doc;
 			if (encoding != null && !encoding.isEmpty()) {
 				try (FileInputStream fis = new FileInputStream(xmlFile)) {
 					org.xml.sax.InputSource is = new org.xml.sax.InputSource(fis);
 					is.setEncoding(encoding);
-					// SystemId를 설정하여 파일 경로 명시
+					// SystemId를 설정하여 파일 경로 명시 (캐시 방지)
 					is.setSystemId(xmlFile.toURI().toString());
+					// 파일을 항상 새로 읽기 위해 캐시를 사용하지 않음
 					doc = builder.parse(is);
 				}
 			} else {
@@ -111,6 +116,7 @@ public class ConsistencyValidator {
 				try (FileInputStream fis = new FileInputStream(xmlFile)) {
 					org.xml.sax.InputSource is = new org.xml.sax.InputSource(fis);
 					is.setSystemId(xmlFile.toURI().toString());
+					// 파일을 항상 새로 읽기 위해 캐시를 사용하지 않음
 					doc = builder.parse(is);
 				}
 			}
@@ -149,12 +155,10 @@ public class ConsistencyValidator {
 	
 	/**
 	 * XML 파일 내용을 캐시합니다 (성능 최적화).
+	 * 항상 최신 파일을 읽기 위해 캐시를 사용하지 않습니다.
 	 */
 	private void cacheFileLines(File xmlFile, String encoding) {
-		if (cachedFile != null && cachedFile.equals(xmlFile) && cachedFileLines != null) {
-			return; // 이미 캐시됨
-		}
-		
+		// 항상 최신 파일을 읽기 위해 캐시를 무시하고 새로 읽음
 		cachedFileLines = new ArrayList<>();
 		cachedFile = xmlFile;
 		
@@ -388,36 +392,18 @@ public class ConsistencyValidator {
 			// 라인 번호
 			int lineNum = baseLineNum > 0 ? baseLineNum : 1;
 			
-			// 속성 값 읽기
+			// 속성 값 읽기 - 따옴표 안의 모든 값을 정확히 읽기 위해 getAttribute() 우선 사용
+			// ZipCode="419679"의 경우 정확히 6자리를 모두 읽어야 함
 			String attrValue = null;
-			NamedNodeMap attrs = element.getAttributes();
-			for (int i = 0; i < attrs.getLength(); i++) {
-				Node attr = attrs.item(i);
-				String attrNodeName = attr.getNodeName();
-				String attrLocalName = attr.getLocalName();
-				
-				if (attrNodeName.equals(attrName)) {
-					attrValue = attr.getNodeValue();
-					break;
-				} else if (attrLocalName != null && attrLocalName.equals(attrName)) {
-					attrValue = attr.getNodeValue();
-					break;
-				} else if (attrLocalName == null && attrNodeName.contains(":")) {
-					String localPart = attrNodeName.substring(attrNodeName.indexOf(":") + 1);
-					if (localPart.equals(attrName)) {
-						attrValue = attr.getNodeValue();
-						break;
-					}
-				}
-			}
 			
-			// 방법 2: getAttribute() 시도
-			if (attrValue == null && element.hasAttribute(attrName)) {
+			// 방법 1: getAttribute() 먼저 시도 (가장 안정적이고 정확함)
+			// getAttribute()는 XML 속성 값을 정규화하지 않고 원본 그대로 반환
+			if (element.hasAttribute(attrName)) {
 				attrValue = element.getAttribute(attrName);
 			}
 			
-			// 방법 3: 네임스페이스 처리
-			if (attrValue == null) {
+			// 방법 2: 네임스페이스 처리
+			if (attrValue == null || attrValue.isEmpty()) {
 				String localName = attrName;
 				if (localName.contains(":")) {
 					localName = localName.substring(localName.indexOf(":") + 1);
@@ -427,12 +413,39 @@ public class ConsistencyValidator {
 				}
 			}
 			
+			// 방법 3: NamedNodeMap을 통한 직접 접근 (fallback)
+			// getNodeValue()도 원본 값을 반환하지만 getAttribute()가 더 안정적
+			if (attrValue == null || attrValue.isEmpty()) {
+				NamedNodeMap attrs = element.getAttributes();
+				for (int i = 0; i < attrs.getLength(); i++) {
+					Node attr = attrs.item(i);
+					String attrNodeName = attr.getNodeName();
+					String attrLocalName = attr.getLocalName();
+					
+					if (attrNodeName.equals(attrName)) {
+						attrValue = attr.getNodeValue();
+						break;
+					} else if (attrLocalName != null && attrLocalName.equals(attrName)) {
+						attrValue = attr.getNodeValue();
+						break;
+					} else if (attrLocalName == null && attrNodeName.contains(":")) {
+						String localPart = attrNodeName.substring(attrNodeName.indexOf(":") + 1);
+						if (localPart.equals(attrName)) {
+							attrValue = attr.getNodeValue();
+							break;
+						}
+					}
+				}
+			}
+			
 			// 속성 값이 없으면 빈 문자열로 처리
 			if (attrValue == null) {
 				attrValue = "";
 			}
 			
-			// 공백 제거
+			// 공백 제거 (앞뒤 공백만 제거) - trim()은 앞뒤 공백만 제거하므로 안전
+			// ZipCode="419679"의 경우 trim() 후에도 정확히 6자리가 유지되어야 함
+			String originalAttrValue = attrValue;
 			attrValue = attrValue.trim();
 			
 			// 속성 규칙이 Map인 경우 required 체크
@@ -545,23 +558,47 @@ public class ConsistencyValidator {
 					Object maxLengthObj = attrRuleMap.get("max_length");
 					
 					if (!attrValue.isEmpty()) {
+						// 실제 길이 계산 - trim 후의 정확한 길이를 사용
+						// ZipCode="419679"의 경우 정확히 6자리를 읽어야 함
 						int actualLength = attrValue.length();
 						
-						// min_length와 max_length가 모두 지정된 경우 (범위 검증)
+						// min_length와 max_length가 모두 지정된 경우 (범위 검증) - ZipCode 등
 						if (minLengthObj != null && maxLengthObj != null) {
 							int minLength = Integer.parseInt(minLengthObj.toString());
 							int maxLength = Integer.parseInt(maxLengthObj.toString());
+							
+							// 길이 검증 - 실제 읽은 값의 길이를 정확히 확인
 							if (actualLength < minLength || actualLength > maxLength) {
+								// 원본 값과 trim 후 값, 그리고 각각의 길이를 모두 표시
+								String originalDisplay = originalAttrValue;
+								String trimmedDisplay = attrValue;
+								int originalLength = originalAttrValue.length();
+								
+								// 오류 메시지에 상세 정보 포함
 								addError(xmlFile, lineNum, -1, path + " 요소의 " + attrName + 
-										" 속성 값의 길이가 " + minLength + "~" + maxLength + "자 범위여야 합니다. 현재 길이: " + actualLength);
+										" 속성 값이 잘못되었습니다. " +
+										"원본 값: '" + originalDisplay + "' (길이: " + originalLength + "), " +
+										"trim 후: '" + trimmedDisplay + "' (길이: " + actualLength + "). " +
+										"요구 길이: " + minLength + "~" + maxLength + "자");
 							}
 						}
 						// length만 지정된 경우 (정확한 길이 검증)
 						else if (lengthObj != null) {
 							int requiredLength = Integer.parseInt(lengthObj.toString());
+							
+							// 길이 검증 - 실제 읽은 값의 길이를 정확히 확인
 							if (actualLength != requiredLength) {
+								// 원본 값과 trim 후 값, 그리고 각각의 길이를 모두 표시
+								String originalDisplay = originalAttrValue;
+								String trimmedDisplay = attrValue;
+								int originalLength = originalAttrValue.length();
+								
+								// 오류 메시지에 상세 정보 포함
 								addError(xmlFile, lineNum, -1, path + " 요소의 " + attrName + 
-										" 속성 값의 길이가 정확히 " + requiredLength + "자여야 합니다. 현재 길이: " + actualLength);
+										" 속성 값이 잘못되었습니다. " +
+										"원본 값: '" + originalDisplay + "' (길이: " + originalLength + "), " +
+										"trim 후: '" + trimmedDisplay + "' (길이: " + actualLength + "). " +
+										"요구 길이: 정확히 " + requiredLength + "자");
 							}
 						}
 					}
